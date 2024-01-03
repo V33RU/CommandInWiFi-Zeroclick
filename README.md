@@ -1,4 +1,3 @@
 ## CommandInWiFi
-![](CommandInWiFi-sticker.png){width=100 height=100}
-
+<img src="CommandInWiFi-sticker.png" alt="drawing" style="width:200px;"/>
 CommandInWiFi: Investigating Command Injection Flaws in WiFi Access Point Storage
