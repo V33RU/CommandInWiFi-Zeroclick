@@ -9,3 +9,61 @@
 <p align="center">
   Investigating Command Injection Flaws in WiFi Access Point Storage
 </p>
+
+
+--
+### Description :
+This code is designed to interact with Wi-Fi SSIDs stored on client devices. It is common knowledge that devices save Wi-Fi SSIDs internally, and understanding how they store and discover these SSID names is crucial. 
+
+From my observations, some devices allow SSID names to be used as carriers for payloads. In scenarios where devices lack proper security, these payload-bearing SSIDs can be executed at the Linux level. The reaction of a device to specific payloads is key here. If a device interprets a payload as a command, it can range from causing Denial of Service (DoS) to enabling Remote Code Execution (RCE). This includes actions like opening ports for unauthorized access, which can significantly impact network-based IoT devices. 
+
+My code specifically targets this vulnerability by forcing the device to reboot whenever it encounters an SSID that carries a predetermined payload. This approach demonstrates the potential impacts and risks associated with how devices handle SSID names. 
+
+--
+### Installaion and Requirements 
+#### 1. Hardware Setup
+Ensure you have:
+- A NodeMCU ESP8266 board.
+- A USB cable for connection.
+- A computer with Arduino IDE installed.
+
+#### 2. Arduino IDE Setup
+- **Install Arduino IDE**: Download from [Arduino website](https://www.arduino.cc/en/Main/Software).
+- **Add ESP8266 Board**:
+  - Open Arduino IDE.
+  - Go to `File > Preferences`.
+  - Add URL: `http://arduino.esp8266.com/stable/package_esp8266com_index.json`.
+  - Install ESP8266 via `Tools > Board > Boards Manager`.
+- **Select Your Board**:
+  - `Tools > Board` and select "NodeMCU 1.0 (ESP-12E Module)".
+- **Choose Correct Port**:
+  - `Tools > Port` and select your NodeMCU's COM port.
+
+#### 3. Loading the Code
+- **Open New Sketch**:
+  - `File > New` in Arduino IDE.
+- **Copy-Paste Code**:
+  - Copy provided NodeMCU code.
+  - Paste into Arduino IDE sketch.
+
+#### 4. Customizing the Code
+- Modify SSID and password as needed.
+
+#### 5. Uploading the Code
+- **Compile and Upload**:
+  - Click "Upload" in Arduino IDE.
+  - Wait for completion message.
+
+#### 6. Monitoring and Debugging
+- **Open Serial Monitor**:
+  - `Tools > Serial Monitor`.
+  - Match baud rate with your code (commonly `115200`).
+
+#### 7. Testing and Iteration
+- **Test Functionality** and iterate as needed.
+
+#### 8. Safety and Legal Concerns
+- **Handle with Care**: Disconnect power when adjusting connections.
+- **Legal Compliance**: Ensure compliance with laws and regulations.
+
+-----------------
