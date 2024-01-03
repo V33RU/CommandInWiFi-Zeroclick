@@ -22,8 +22,11 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 
 ------------------------------------
 PoC:
+
 ![](ssid-changing.png)
+
 ![](expecte output.png)
+
 ----------------------------------
 ### Installaion and Requirements 
 #### 1. Hardware Setup
