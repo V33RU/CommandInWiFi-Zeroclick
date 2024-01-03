@@ -22,8 +22,8 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 
 ------------------------------------
 PoC:
-
-
+![](ssid-changing.png)
+![](expecte output.png)
 ----------------------------------
 ### Installaion and Requirements 
 #### 1. Hardware Setup
@@ -68,7 +68,7 @@ Ensure you have:
 - **Test Functionality** and iterate as needed.
 
 <p align="center">
-  <img src="flash.png" alt="CommandInWiFi sticker" style="width:200px;"/>
+  <img src="flash.png" alt="flash" style="width:200px;"/>
 </p>
 
 #### 8. Safety and Legal Concerns
