@@ -77,7 +77,7 @@ Ensure you have:
 To ensure your laptop can discover the NodeMCU via USB in the Arduino IDE:
   
   **Remove Conflicting Packages**:
-   Ubuntu 22.04 may have `brltty` installed, which can interfere with USB recognition. Remove it using:
+   - Ubuntu 22.04 may have `brltty` installed, which can interfere with USB recognition. Remove it using:
    `
    sudo apt remove brltty
    `
