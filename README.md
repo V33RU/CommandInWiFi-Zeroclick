@@ -25,7 +25,7 @@ PoC:
 
 ![](poc/ssid-changing.png)
 
-![](poc/expecte output.png)
+![](poc/expecte-output.png)
 
 ----------------------------------
 ### Installaion and Requirements 
@@ -71,7 +71,7 @@ Ensure you have:
 - **Test Functionality** and iterate as needed.
 
 <p align="center">
-  <img src="flash.png" alt="flash" style="width:200px;"/>
+  <img src="poc/flash.png" alt="flash" style="width:200px;"/>
 </p>
 
 #### 8. Safety and Legal Concerns
