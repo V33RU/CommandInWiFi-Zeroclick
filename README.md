@@ -67,6 +67,10 @@ Ensure you have:
 #### 7. Testing and Iteration
 - **Test Functionality** and iterate as needed.
 
+<p align="center">
+  <img src="flash.png" alt="CommandInWiFi sticker" style="width:200px;"/>
+</p>
+
 #### 8. Safety and Legal Concerns
 - **Handle with Care**: Disconnect power when adjusting connections.
 - **Legal Compliance**: Ensure compliance with laws and regulations.
