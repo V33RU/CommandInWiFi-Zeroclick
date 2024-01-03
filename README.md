@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  Investigating Command Injection Flaws in WiFi Access Point Storage , This project inspired by zero-clicks attacks.
+  Investigating Command Injection Flaws in WiFi Access Point Storage , This project inspired by zero-click attacks.
 </p>
 
 
