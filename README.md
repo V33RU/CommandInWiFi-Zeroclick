@@ -7,11 +7,12 @@
 </p>
 
 <p align="center">
-  Investigating Command Injection Flaws in WiFi Access Point Storage
+  Investigating Command Injection Flaws in WiFi Access Point Storage , This project inspired by zero-clicks attacks.
 </p>
 
 
---
+-------------------------------
+
 ### Description :
 This code is designed to interact with Wi-Fi SSIDs stored on client devices. It is common knowledge that devices save Wi-Fi SSIDs internally, and understanding how they store and discover these SSID names is crucial. 
 
@@ -19,7 +20,11 @@ From my observations, some devices allow SSID names to be used as carriers for p
 
 My code specifically targets this vulnerability by forcing the device to reboot whenever it encounters an SSID that carries a predetermined payload. This approach demonstrates the potential impacts and risks associated with how devices handle SSID names. 
 
---
+------------------------------------
+PoC:
+
+
+----------------------------------
 ### Installaion and Requirements 
 #### 1. Hardware Setup
 Ensure you have:
@@ -67,3 +72,22 @@ Ensure you have:
 - **Legal Compliance**: Ensure compliance with laws and regulations.
 
 -----------------
+#### Note for Ubuntu 22.04 Users: Ensuring NodeMCU Discovery
+
+To ensure your laptop can discover the NodeMCU via USB in the Arduino IDE:
+  
+  **Remove Conflicting Packages**:
+   Ubuntu 22.04 may have `brltty` installed, which can interfere with USB recognition. Remove it using:
+   `
+   sudo apt remove brltty
+   `
+----------------------------------
+#### Referral Links
+
+- [What is Zero-Click Malware? - Kaspersky](https://www.kaspersky.com/resource-center/definitions/what-is-zero-click-malware)
+- [Meet WiFiDemon: iOS WiFi RCE 0-Day Vulnerability - ZecOps Blog](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/)
+- [What is a Zero-Click Attack? - Check Point](https://www.checkpoint.com/cyber-hub/cyber-security/what-is-a-zero-click-attack/)
+- [Apple Quietly Patched 0-Click Wi-Fi Code Execution Vulnerability - SecurityWeek](https://www.securityweek.com/researchers-apple-quietly-patched-0-click-wi-fi-code-execution-vulnerability-ios/)
+- [Marvell Avastar Wi-Fi Vulnerability - Help Net Security](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/)
+- [OS Command Injection - PortSwigger](https://portswigger.net/web-security/os-command-injection)
+
