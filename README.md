@@ -76,7 +76,7 @@ Ensure you have:
 - **Test Functionality** and iterate as needed.
 
 <p align="center">
-  <img src="poc/flash.png" alt="flash" style="width:200px;"/>
+  <img src="poc/flash.png" alt="flash" style="width:600px;"/>
 </p>
 
 #### 8. Safety and Legal Concerns
