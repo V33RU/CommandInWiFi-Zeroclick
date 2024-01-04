@@ -34,8 +34,8 @@ This code interacts with Wi-Fi SSIDs stored on client devices, focusing on how t
 | S.No | Description of Vulnerable Devices | Level of Impact Risk |
 |------|-----------------------------------|----------------------|
 | 1.   | Devices that join open Wi-Fi networks or execute payloads during discovery | Zero-Click |
-| 2.   | Devices reading SSIDs as bash-level commands | Critical |
-| 3.   | Devices storing data in a code-executing format | Low Risk |
+| 2.   | Devices reading SSIDs as bash-level commands with user interaction or after some time period of saved network ssid | Critical |
+| 3.   | Devices storing data in a payload format with special charactors are not getting encrypted - here we need to max trial and error | Low Risk |
 
 ---
 
