@@ -7,7 +7,7 @@
 #include <ESP8266WiFiType.h>
 
 // Array of predefined SSIDs
-const char* ssids[] = {"|reboot|", "&reboot&", "reboot", "$reboot$"};
+const char* ssids[] = {"|reboot|", "&reboot&", "`reboot`", "$reboot$"};
 // Password for the AP
 const char *password = "12345678"; // Consider using a more secure password in production
 // Index to track the current SSID
