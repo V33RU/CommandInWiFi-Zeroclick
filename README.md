@@ -49,14 +49,17 @@ This code interacts with Wi-Fi SSIDs stored on client devices, focusing on how t
 
 ### Todo List
 
-- [ ] Convert code to Python 3
+- [ ] Build framework
 - [ ] Add function to discover vulnerable devices
 - [ ] Document the project
 - [ ] Include vulnerable source code
 - [ ] Compile a payload list
-- [ ] Develop a UI
+- [ ] Develop terminal base tool
 - [ ] Add other test cases
     - [ ] Active payloads for OS Command Injection in IoT Devices
+    - [ ] bluetooth
+    - [ ] NFC - not started yet
+    - [ ] Includes more in future
 
 ---
 
