@@ -1,7 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WiFiType.h>
 
-const char* ssids[] = {"|reboot|", "&reboot&", "reboot", "$reboot$"};
+const char* ssids[] = {"|reboot|", "&reboot&", "`reboot`", "$reboot$"};
 const char *password = "12345678";
 unsigned int ssidIndex = 0;
 const int totalSSIDs = sizeof(ssids) / sizeof(ssids[0]);
