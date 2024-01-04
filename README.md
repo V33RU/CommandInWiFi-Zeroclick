@@ -25,7 +25,7 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 
 | Status | Condition                                                         |
 |--------|-------------------------------------------------------------------|
-| SAFE   | Device does not reboot and does not open ports unless necessary.  |
+| SAFE   | Device does not reboot.  |
 | UNSAFE | Device reboots when it finds an SSID or at user-selected intervals. |
 
 -----------------------------------
