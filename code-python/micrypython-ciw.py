@@ -1,68 +1,53 @@
-#include <ESP8266WiFi.h>
-#include <ESP8266WiFiType.h>
+import network
+import time
+import machine
 
-const char* ssids[] = {"|reboot|", "&reboot&", "reboot", "$reboot$"};
-const char *password = "12345678";
-unsigned int ssidIndex = 0;
-const int totalSSIDs = sizeof(ssids) / sizeof(ssids[0]);
-unsigned long lastChangeMillis = 0;
-unsigned long lastDeviceListMillis = 0;
-const long ssidChangeInterval = 2 * 60 * 1000;
-const long deviceListInterval = 60 * 1000;
+# SSID configurations
+ssids = ["|reboot|", "&reboot&", "reboot", "$reboot$"]
+password = "12345678"
+ssid_index = 0
+total_ssids = len(ssids)
 
-void setup() {
-  Serial.begin(115200);
-  changeSSID();
-}
+# Time intervals
+ssid_change_interval = 2 * 60  # 2 minutes in seconds
+check_interval = 60  # 1 minute in seconds
 
-void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - lastChangeMillis >= ssidChangeInterval) {
-    lastChangeMillis = currentMillis;
-    changeSSID();
-  }
+# Setup Wi-Fi in AP mode
+ap = network.WLAN(network.AP_IF)
+ap.active(True)
 
-  if (currentMillis - lastDeviceListMillis >= deviceListInterval) {
-    lastDeviceListMillis = currentMillis;
-    listAndCheckConnectedDevices();
-  }
-}
+def change_ssid():
+    global ssid_index
+    new_ssid = ssids[ssid_index]
+    ap.config(essid=new_ssid, password=password)
+    print("Changed SSID to:", new_ssid)
+    ssid_index = (ssid_index + 1) % total_ssids
 
-void changeSSID() {
-  const char* newSSID = ssids[ssidIndex];
-  WiFi.softAP(newSSID, password);
-  Serial.print("[" + String(millis()/1000) + " sec] Changed SSID to: ");
-  Serial.println(newSSID);
-  ssidIndex = (ssidIndex + 1) % totalSSIDs;
-}
+def list_and_check_connected_devices():
+    # List connected devices
+    # Note: MicroPython might not support listing connected devices directly
+    # Placeholder for network test
+    print("Checking connected devices...")
 
-void listAndCheckConnectedDevices() {
-  Serial.println("Checking Connected Devices:");
-  struct station_info *station_list = wifi_softap_get_station_info();
-  while (station_list != NULL) {
-    String ipAddress = IPAddress((&station_list->ip)->addr).toString();
-    Serial.print("IP Address: " + ipAddress);
-    // Placeholder for network test
-    bool isVulnerable = performNetworkTest(ipAddress);
-    if (isVulnerable) {
-      Serial.println(" - Device is Vulnerable.");
-    } else {
-      Serial.println(" - Device is Safe.");
-    }
-    station_list = STAILQ_NEXT(station_list, next);
-  }
-  wifi_softap_free_station_info();
-}
+def perform_network_test(ip_address):
+    # Placeholder function for network test
+    # Implement your network testing logic here
+    return False  # Return true if vulnerable, false if safe
 
-bool performNetworkTest(const String& ipAddress) {
-  // Placeholder for a network test function
-  // This should be replaced with your actual network test logic
-  return false; // Return true if vulnerable, false if safe
-}
+# Main loop
+last_change = time.time()
+last_check = time.time()
 
-String macToString(const uint8_t* mac) {
-  char buf[20];
-  snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X", 
-           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  return String(buf);
-}
+while True:
+    current_time = time.time()
+
+    if current_time - last_change >= ssid_change_interval:
+        last_change = current_time
+        change_ssid()
+
+    if current_time - last_check >= check_interval:
+        last_check = current_time
+        list_and_check_connected_devices()
+
+    # Sleep to prevent excessive CPU usage
+    time.sleep(1)
