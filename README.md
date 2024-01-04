@@ -12,6 +12,9 @@
 
 
 -------------------------------
+### Disclaimer 
+- Purpose of the Code: If this code is for testing or educational purposes, ensure it's used ethically and legally.
+- IoT Security Testing: As an IoT Security Engineer, using such a setup could be part of a penetration testing toolkit to assess how devices behave under different network conditions.
 
 ### Description :
 This code is designed to interact with Wi-Fi SSIDs stored on client devices. It is common knowledge that devices save Wi-Fi SSIDs internally, and understanding how they store and discover these SSID names is crucial. 
