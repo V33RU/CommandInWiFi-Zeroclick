@@ -25,8 +25,16 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 | SAFE   | Device does not reboot and does not open ports unless necessary.  |
 | UNSAFE | Device reboots when it finds an SSID or at user-selected intervals. |
 
+-----------------------------------
+#### Target Decvices 
+| S.No | Possible Devices vulnerable | Chances of Impact |
+|---|---|---|
+|1.| Device has autojoin to open wifi networks | Zeroday |
+|2.| Device discovery reading SSID with bash level | Critical |
+|3.| Device store in format executing code | Low |
+
 ------------------------------------
-PoC:
+#### PoC:
 
 ![](poc/ssid-changing.png)
 
