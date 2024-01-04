@@ -19,7 +19,7 @@
 ### Description :
 This code is designed to interact with Wi-Fi SSIDs stored on client devices. It is common knowledge that devices save Wi-Fi SSIDs internally, and understanding how they store and discover these SSID names is crucial. 
 
-From my observations, some devices allow SSID names to be used as carriers for payloads. In scenarios where devices lack proper security, these payload-bearing SSIDs can be executed at the Linux level. The reaction of a device to specific payloads is key here. If a device interprets a payload as a command, it can range from causing Denial of Service (DoS) to enabling Remote Code Execution (RCE). This includes actions like opening ports for unauthorized access, which can significantly impact network-based IoT devices. 
+From my observations, some devices allow SSID names to be used as carriers for payloads. In scenarios where devices lack proper security, these payload-bearing SSIDs can be executed at the bash level. The reaction of a device to specific payloads is key here. If a device interprets a payload as a command, it can range from causing Denial of Service (DoS) to enabling Remote Code Execution (RCE). This includes actions like opening ports for unauthorized access, which can significantly impact network-based IoT devices. 
 
 My code specifically targets this vulnerability by forcing the device to reboot whenever it encounters an SSID that carries a predetermined payload. This approach demonstrates the potential impacts and risks associated with how devices handle SSID names. 
 
