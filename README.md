@@ -29,12 +29,13 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 | UNSAFE | Device reboots when it finds an SSID or at user-selected intervals. |
 
 -----------------------------------
-#### Target Decvices 
-| S.No | Possible Devices vulnerable | Chances of Impact |
-|---|---|---|
-|1.| Device has autojoin to open wifi networks | Zeroday |
-|2.| Device discovery reading SSID with bash level | Critical |
-|3.| Device store in format executing code | Low |
+#### Target Devices Vulnerable to Zero-Click Attacks
+
+| S.No | Description of Vulnerable Devices | Level of Impact Risk |
+|------|-----------------------------------|----------------------|
+| 1.   | Devices that automatically join open Wi-Fi networks or execute payloads during network discovery | Zero-Click |
+| 2.   | Devices that read SSIDs and interpret them as commands at the bash level | Critical |
+| 3.   | Devices that store data in a format which inadvertently executes code | Low Risk |
 
 ------------------------------------
 #### PoC:
