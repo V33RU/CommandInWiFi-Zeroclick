@@ -7,56 +7,59 @@
 </p>
 
 <p align="center">
-  Investigating Command Injection Flaws in WiFi Access Point Storage , This project inspired by zero-click attacks.
+  Investigating Command Injection Flaws in WiFi Access Point Storage<br/>
+  Inspired by Zero-Click Attacks
 </p>
 
+---
 
--------------------------------
-### Disclaimer 
-- Purpose of the Code: If this code is for testing or educational purposes, ensure it's used ethically and legally.
-- IoT Security Testing: As an IoT Security Engineer, using such a setup could be part of a penetration testing toolkit to assess how devices behave under different network conditions.
+### Disclaimer
 
-### Description :
-This code is designed to interact with Wi-Fi SSIDs stored on client devices. It is common knowledge that devices save Wi-Fi SSIDs internally, and understanding how they store and discover these SSID names is crucial. 
+- **Purpose of the Code**: For testing or educational purposes only. Use ethically and legally.
+- **IoT Security Testing**: Ideal for IoT Security Engineers for penetration testing to assess device behavior under different network conditions.
 
-From my observations, some devices allow SSID names to be used as carriers for payloads. In scenarios where devices lack proper security, these payload-bearing SSIDs can be executed at the bash level. The reaction of a device to specific payloads is key here. If a device interprets a payload as a command, it can range from causing Denial of Service (DoS) to  Remote Code Execution (RCE). This includes actions like opening ports for unauthorized access, which can significantly impact Wi-Fi network-based IoT devices. 
+### Description
 
-My code specifically targets this vulnerability by forcing the device to reboot whenever it encounters an SSID that carries a predetermined payload. This approach demonstrates the potential impacts and risks associated with how devices handle SSID names. 
+This code interacts with Wi-Fi SSIDs stored on client devices, focusing on how these devices save and discover SSIDs. Some devices may use SSID names as payload carriers, which can be executed at the bash level. This vulnerability ranges from causing Denial of Service (DoS) to Remote Code Execution (RCE), including unauthorized port access, impacting Wi-Fi network-based IoT devices significantly. The code aims to reboot devices when they encounter a pre-set payload-bearing SSID.
 
-| Status | Condition                                                         |
-|--------|-------------------------------------------------------------------|
-| SAFE   | Device does not reboot.  |
-| UNSAFE | Device reboots when it finds an SSID or at user-selected intervals. |
+| Status | Condition |
+|--------|-----------|
+| SAFE   | Device does not reboot. |
+| UNSAFE | Device reboots upon encountering a specific SSID or at user-defined intervals. |
 
------------------------------------
+---
+
 #### Target Devices Vulnerable to Zero-Click Attacks
 
 | S.No | Description of Vulnerable Devices | Level of Impact Risk |
 |------|-----------------------------------|----------------------|
-| 1.   | Devices that automatically join open Wi-Fi networks or execute payloads during network discovery | Zero-Click |
-| 2.   | Devices that read SSIDs and interpret them as commands at the bash level | Critical |
-| 3.   | Devices that store data in a format which inadvertently executes code | Low Risk |
+| 1.   | Devices that join open Wi-Fi networks or execute payloads during discovery | Zero-Click |
+| 2.   | Devices reading SSIDs as bash-level commands | Critical |
+| 3.   | Devices storing data in a code-executing format | Low Risk |
 
-------------------------------------
-#### PoC:
+---
+
+#### Proof of Concept (PoC)
 
 ![](poc/ssid-changing.png)
 
 ![](poc/expecte-output.png)
 
---------------------------------
-```[tasklist]
-### todo
-- [ ] Convert code into python3
-- [ ] add function for discovering vulnerable device or not
-- [ ] Document it
-- [ ] Add vulnerable source code
-- [ ] payload list
-- [ ] Adding UI
-- [ ] Add other testcases
-    - [ ] OS Command injection active payloads for IoT Devices
-```
-----------------------------------
+---
+
+### Todo List
+
+- [ ] Convert code to Python 3
+- [ ] Add function to discover vulnerable devices
+- [ ] Document the project
+- [ ] Include vulnerable source code
+- [ ] Compile a payload list
+- [ ] Develop a UI
+- [ ] Add other test cases
+    - [ ] Active payloads for OS Command Injection in IoT Devices
+
+---
+
 #### Referral Links
 
 - [What is Zero-Click Malware? - Kaspersky](https://www.kaspersky.com/resource-center/definitions/what-is-zero-click-malware)
@@ -65,4 +68,3 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 - [Apple Quietly Patched 0-Click Wi-Fi Code Execution Vulnerability - SecurityWeek](https://www.securityweek.com/researchers-apple-quietly-patched-0-click-wi-fi-code-execution-vulnerability-ios/)
 - [Marvell Avastar Wi-Fi Vulnerability - Help Net Security](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/)
 - [OS Command Injection - PortSwigger](https://portswigger.net/web-security/os-command-injection)
-
