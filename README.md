@@ -50,9 +50,7 @@ My code specifically targets this vulnerability by forcing the device to reboot 
 - [ ] payload list
 - [ ] Adding UI
 - [ ] Add other testcases
-    - [ ] XSS
-    - [ ] path traversal
-    - [ ] OS Command injection
+    - [ ] OS Command injection active payloads for IoT Devices
 ```
 ----------------------------------
 #### Referral Links
