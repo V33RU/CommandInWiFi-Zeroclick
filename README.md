@@ -32,6 +32,20 @@ PoC:
 
 ![](poc/expecte-output.png)
 
+--------------------------------
+```[tasklist]
+### todo
+- [ ] Convert code into python3
+- [ ] add function for discovering vulnerable device or not
+- [ ] Document it
+- [ ] Add vulnerable source code
+- [ ] payload list
+- [ ] Adding UI
+- [ ] Add other testcases
+    - [ ] XSS
+    - [ ] path traversal
+    - [ ] OS Command injection
+```
 ----------------------------------
 #### Referral Links
 
