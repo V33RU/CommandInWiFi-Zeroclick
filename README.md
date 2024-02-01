@@ -72,3 +72,4 @@ This code interacts with Wi-Fi SSIDs stored on client devices, focusing on how t
 - [Apple Quietly Patched 0-Click Wi-Fi Code Execution Vulnerability - SecurityWeek](https://www.securityweek.com/researchers-apple-quietly-patched-0-click-wi-fi-code-execution-vulnerability-ios/)
 - [Marvell Avastar Wi-Fi Vulnerability - Help Net Security](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/)
 - [OS Command Injection - PortSwigger](https://portswigger.net/web-security/os-command-injection)
+- [CVE-2023–45866: 0-Click Bluetooth vulnerability](https://github.com/marcnewlin/hi_my_name_is_keyboard)
