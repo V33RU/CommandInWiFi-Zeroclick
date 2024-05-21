@@ -21,9 +21,8 @@
 
 ### Description
 
-```
-This code Creates Wi-Fi SSIDs based provided payload data names, focussing on how these devices save and discover SSIDs. Some devices may use SSID names as payload carriers, which can be executed at the bash level. This vulnerability ranges from causing Denial of Service (DoS) to Remote Code Execution (RCE), including unauthorized port access, impacting Wi-Fi network-based IoT devices significantly. The code aims to reboot devices when they encounter a pre-set payload-bearing SSID.
-```
+`This code Creates Wi-Fi SSIDs based provided payload data names, focussing on how these devices save and discover SSIDs. Some devices may use SSID names as payload carriers, which can be executed at the bash level. This vulnerability ranges from causing Denial of Service (DoS) to Remote Code Execution (RCE), including unauthorized port access, impacting Wi-Fi network-based IoT devices significantly. The code aims to reboot devices when they encounter a pre-set payload-bearing SSID.
+`
 
 | Status | Condition |
 |--------|-----------|
