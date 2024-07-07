@@ -14,7 +14,7 @@
 ---
 
 ### Disclaimer
-##### this project under building ..
+##### this project under building..
 
 - **Purpose of the Code**: For testing or educational purposes only. Use ethically and legally.
 - **IoT Security Testing**: Ideal for IoT Security Engineers for penetration testing to assess device behavior under different network conditions.
