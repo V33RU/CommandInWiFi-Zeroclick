@@ -7,6 +7,9 @@
 </p>
 
 <p align="center">
+  <img src="Command In Wi-Fi-1.png" alt="CommandInWiFi sticker" style="width:200px;"/>
+</p>
+<p align="center">
   Investigating Command Injection Flaws in WiFi Access Point Storage<br/>
   Inspired by Zero-Click Attacks
 </p>
