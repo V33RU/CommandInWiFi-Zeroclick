@@ -102,6 +102,4 @@ Example Use:
 - [OS Command Injection - PortSwigger](https://portswigger.net/web-security/os-command-injection)
 - [CVE-2023–45866 (Bluetooth Zero-Click)](https://github.com/marcnewlin/hi_my_name_is_keyboard)
 
----
 
-> Created by [iotsrg.org](https://iotsrg.org) – Uplifting the IoT Security Underground
