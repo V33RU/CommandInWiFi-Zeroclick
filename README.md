@@ -1,79 +1,107 @@
+
 <p align="center">
   <strong>CommandInWiFi</strong>
 </p>
 
 <p align="center">
-  <img src="CommandInWiFi-sticker.png" alt="CommandInWiFi sticker" style="width:200px;"/>
+  <img src="CommandInWiFi-sticker.png" alt="CommandInWiFi sticker" width="200"/>
 </p>
 
 <p align="center">
-  <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi sticker" style="width:200px;"/>
+  <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi PoC" width="200"/>
 </p>
+
 <p align="center">
-  Investigating Command Injection Flaws in WiFi Access Point Storage<br/>
+  <em>Investigating Command Injection Flaws in WiFi Access Point Storage</em><br/>
   Inspired by Zero-Click Attacks
 </p>
 
 ---
 
-### Disclaimer
-##### this project under building..
+## ⚠️ Disclaimer
 
-- **Purpose of the Code**: For testing or educational purposes only. Use ethically and legally.
-- **IoT Security Testing**: Ideal for IoT Security Engineers for penetration testing to assess device behavior under different network conditions.
+> This project is under development.
 
-### Description
-
-``This code Creates Wi-Fi SSIDs based provided payload data names, focussing on how these devices save and discover SSIDs. Some devices may use SSID names as payload carriers, which can be executed at the bash level. This vulnerability ranges from causing Denial of Service (DoS) to Remote Code Execution (RCE), including unauthorized port access, impacting Wi-Fi network-based IoT devices significantly. The code aims to reboot devices when they encounter a pre-set payload-bearing SSID.
-``
-
-| Status | Condition |
-|--------|-----------|
-| SAFE   | Device does not reboot. |
-| UNSAFE | Device reboots upon encountering a specific SSID or at user-defined intervals. |
+- **Purpose**: Strictly for educational and research purposes only. Use ethically and legally.
+- **IoT Pentesting Use Case**: Designed for IoT security professionals to evaluate device behavior under abnormal WiFi SSID input conditions.
 
 ---
 
-#### Target Devices Vulnerable to Zero-Click Attacks
+## 📖 Description
 
-| S.No | Description of Vulnerable Devices | Level of Impact Risk |
-|------|-----------------------------------|----------------------|
-| 1.   | Devices that join open Wi-Fi networks or execute payloads during discovery | Zero-Click |
-| 2.   | Devices reading SSIDs as bash-level commands with user interaction or after some time period of saved network ssid | Critical |
-| 3.   | Devices storing data in a payload format with special charactors are not getting encrypted - here we need to max trial and error | Low Risk |
+This tool generates WiFi SSIDs based on user-defined payloads. Certain IoT devices and embedded systems mishandle SSID names by treating them as executable inputs or unsanitized strings during network discovery or storage. This leads to:
 
----
+- Denial of Service (DoS)
+- Remote Code Execution (RCE)
+- Unexpected device reboots
+- Unauthorized port access
 
-#### Proof of Concept (PoC)
+The tool identifies if a device **reboots or crashes** when exposed to malicious SSIDs.
 
-![](poc/ssid-changing.png)
-
-![](poc/expecte-output.png)
-
----
-
-### Todo List
-
-- [ ] Build framework
-- [ ] Add function to discover vulnerable devices
-- [ ] Document the project
-- [ ] Include vulnerable source code
-- [ ] Compile a payload list
-- [ ] Develop terminal base tool
-- [ ] Add other test cases
-    - [ ] Active payloads for OS Command Injection in IoT Devices
-    - [ ] bluetooth
-    - [ ] NFC - not started yet
-    - [ ] Includes more in future
+```text
+Example Use:
+- Inject payload into SSID
+- Monitor device behavior (e.g., unexpected reboot, shell access, crash)
+```
 
 ---
 
-#### Referral Links
+### ✅ Device Behavior Classification
 
-- [What is Zero-Click Malware? - Kaspersky](https://www.kaspersky.com/resource-center/definitions/what-is-zero-click-malware)
-- [Meet WiFiDemon: iOS WiFi RCE 0-Day Vulnerability - ZecOps Blog](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/)
-- [What is a Zero-Click Attack? - Check Point](https://www.checkpoint.com/cyber-hub/cyber-security/what-is-a-zero-click-attack/)
-- [Apple Quietly Patched 0-Click Wi-Fi Code Execution Vulnerability - SecurityWeek](https://www.securityweek.com/researchers-apple-quietly-patched-0-click-wi-fi-code-execution-vulnerability-ios/)
-- [Marvell Avastar Wi-Fi Vulnerability - Help Net Security](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/)
+| Status  | Description                                     |
+|---------|-------------------------------------------------|
+| SAFE    | Device ignores SSID payloads and behaves normally. |
+| UNSAFE  | Device crashes or reboots upon seeing specific SSIDs. |
+
+---
+
+## 🧪 Target Devices Prone to Zero-Click Injection
+
+| S.No | Device Description                                                               | Risk Level    |
+|------|-----------------------------------------------------------------------------------|---------------|
+| 1    | Devices auto-connecting to open SSIDs with no user interaction                   | Zero-Click    |
+| 2    | Devices interpreting saved SSIDs as shell input during boot or network scanning  | Critical      |
+| 3    | Devices with improper escaping of special characters in SSID                     | Low           |
+
+---
+
+## 🔬 Proof of Concept (PoC)
+
+<p align="center">
+  <img src="poc/ssid-changing.png" alt="SSID payload change">
+</p>
+
+<p align="center">
+  <img src="poc/expecte-output.png" alt="Expected Output - Device reboot or crash">
+</p>
+
+---
+
+## 📌 TODO List
+
+- [ ] Develop full testing framework
+- [ ] Auto-discover vulnerable IoT devices
+- [ ] Write project documentation
+- [ ] Add vulnerable firmware/source samples
+- [ ] Maintain a payload injection list
+- [ ] Build CLI-based SSID test tool
+- [ ] Expand test modules:
+  - [ ] OS Command Injection payloads
+  - [ ] Bluetooth vulnerability tests
+  - [ ] NFC fuzzing (planned)
+
+---
+
+## 🔗 Referral Links
+
+- [Zero-Click Malware - Kaspersky](https://www.kaspersky.com/resource-center/definitions/what-is-zero-click-malware)
+- [WiFiDemon - ZecOps](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/)
+- [Zero-Click Attacks - Check Point](https://www.checkpoint.com/cyber-hub/cyber-security/what-is-a-zero-click-attack/)
+- [Apple Silent Patch - SecurityWeek](https://www.securityweek.com/researchers-apple-quietly-patched-0-click-wi-fi-code-execution-vulnerability-ios/)
+- [Marvell Avastar Vulnerability](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/)
 - [OS Command Injection - PortSwigger](https://portswigger.net/web-security/os-command-injection)
-- [CVE-2023–45866: 0-Click Bluetooth vulnerability](https://github.com/marcnewlin/hi_my_name_is_keyboard)
+- [CVE-2023–45866 (Bluetooth Zero-Click)](https://github.com/marcnewlin/hi_my_name_is_keyboard)
+
+---
+
+> Created by [iotsrg.org](https://iotsrg.org) – Uplifting the IoT Security Underground
