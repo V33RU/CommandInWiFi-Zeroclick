@@ -259,7 +259,15 @@ td code {
 
 #matrix-container { overflow-x: auto; }
 
-/* Serial monitor */
+/* Serial monitor — split layout */
+.serial-split {
+    display: flex;
+    gap: 16px;
+}
+
+.serial-left { flex: 1; min-width: 0; }
+.serial-right { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+
 .terminal {
     background: #000;
     color: var(--accent-green);
@@ -276,6 +284,10 @@ td code {
     word-break: break-all;
 }
 
+/* Color-coded terminal lines */
+.term-vuln { color: var(--accent-red); font-weight: 600; }
+.term-device { color: var(--accent-blue); }
+
 .serial-input-row {
     display: flex;
     gap: 8px;
@@ -283,6 +295,144 @@ td code {
 }
 
 .serial-input-row input { flex: 1; }
+
+/* Device tracker panel */
+.device-panel, .vuln-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.device-panel-header, .vuln-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+}
+
+.device-panel-header h3, .vuln-panel-header h3 {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.device-count {
+    background: var(--accent-blue);
+    color: #000;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.vuln-count {
+    background: var(--accent-red);
+    color: #fff;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.device-list, .vuln-log {
+    padding: 8px;
+    max-height: calc(50vh - 160px);
+    min-height: 80px;
+    overflow-y: auto;
+}
+
+.device-card {
+    padding: 6px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background: var(--bg-elevated);
+    border-left: 3px solid var(--accent-blue);
+}
+
+.device-mac {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-blue);
+}
+
+.device-info {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+}
+
+.device-ssid {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.device-time {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Vulnerability entries */
+.vuln-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+.vuln-entry.vuln-crash {
+    background: rgba(255, 51, 51, 0.1);
+    border-left: 3px solid var(--accent-red);
+}
+
+.vuln-entry.vuln-reboot {
+    background: rgba(255, 170, 0, 0.1);
+    border-left: 3px solid var(--accent-amber);
+}
+
+.vuln-badge {
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.vuln-crash .vuln-badge { background: var(--accent-red); color: #fff; }
+.vuln-reboot .vuln-badge { background: var(--accent-amber); color: #000; }
+
+.vuln-mac { color: var(--text-primary); font-weight: 600; flex-shrink: 0; }
+
+.vuln-detail {
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vuln-detail code {
+    background: var(--bg-elevated);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--accent-green);
+}
 
 /* Status badge */
 .status-badge {
