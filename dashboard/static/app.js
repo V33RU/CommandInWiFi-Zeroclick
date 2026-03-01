@@ -523,12 +523,17 @@
             var output = document.getElementById("serial-output");
 
             // Color-code special messages in terminal
-            if (msg.startsWith("[VULN]")) {
-                output.innerHTML += '<span class="term-vuln">' + escapeHtml(msg) + '</span>\n';
-            } else if (msg.startsWith("[DEVICE]")) {
+            if (msg.startsWith("[DEPLOY]") || msg.startsWith("[FLASH]")) {
                 output.innerHTML += '<span class="term-device">' + escapeHtml(msg) + '</span>\n';
             } else {
                 output.textContent += msg + "\n";
+            }
+
+            // Auto-scroll and limit buffer to prevent memory issues
+            if (output.childNodes.length > 2000) {
+                while (output.childNodes.length > 1500) {
+                    output.removeChild(output.firstChild);
+                }
             }
             output.scrollTop = output.scrollHeight;
         };
@@ -567,7 +572,7 @@
                 '<div class="device-card">' +
                 '<div class="device-mac">' + escapeHtml(d.mac) + '</div>' +
                 '<div class="device-info">' +
-                '<span class="device-ssid" title="' + escapeHtml(d.ssid) + '">SSID: ' + escapeHtml(truncate(d.ssid, 18)) + '</span>' +
+                '<span class="device-ssid" title="' + escapeHtml(d.ssid) + '">SSID: ' + escapeHtml(truncate(d.ssid, 16)) + '</span>' +
                 '<span class="device-time">' + timeStr + '</span>' +
                 '</div></div>'
             );
@@ -585,21 +590,59 @@
         }
 
         container.innerHTML = vulns.slice().reverse().map(function (v) {
-            var cls = v.vuln === "reboot" ? "vuln-reboot" : "vuln-crash";
-            var label = v.vuln === "reboot" ? "REBOOT" : "CRASH";
+            var vuln = v.vuln || "crash";
             var dur = v.duration ? v.duration.toFixed(1) + "s" : "?";
+
             return (
-                '<div class="vuln-entry ' + cls + '">' +
-                '<span class="vuln-badge">' + label + '</span>' +
-                '<span class="vuln-mac">' + escapeHtml(v.mac) + '</span>' +
+                '<div class="vuln-entry vuln-crash">' +
+                '<div class="vuln-row-top">' +
+                '<span class="vuln-badge">CRASH</span>' +
+                '</div>' +
+                '<div class="vuln-row-bottom">' +
+                '<span class="vuln-mac">' + escapeHtml(v.mac) + '</span> ' +
                 '<span class="vuln-detail">disconnected after ' + dur +
-                ' on <code>' + escapeHtml(truncate(v.ssid, 16)) + '</code></span>' +
+                ' on <code>' + escapeHtml(truncate(v.ssid || "", 18)) + '</code></span>' +
+                '</div>' +
+                '<button class="vuln-save-btn" data-mac="' + escapeHtml(v.mac) + '" ' +
+                'data-ssid="' + escapeHtml(v.ssid || "") + '" ' +
+                'data-vuln="' + escapeHtml(vuln) + '">Save to Results</button>' +
                 '</div>'
             );
         }).join("");
+
+        // Attach save handlers
+        container.querySelectorAll(".vuln-save-btn").forEach(function (btn) {
+            btn.addEventListener("click", async function () {
+                btn.disabled = true;
+                btn.textContent = "Saving...";
+                try {
+                    var res = await fetch("/api/devices/save-result", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            mac: btn.dataset.mac,
+                            ssid: btn.dataset.ssid,
+                            vuln_type: btn.dataset.vuln,
+                        }),
+                    });
+                    if (res.ok) {
+                        btn.textContent = "Saved";
+                        btn.className = "vuln-save-btn saved";
+                        showToast("Result saved to matrix", "success");
+                    } else {
+                        var err = await res.json();
+                        btn.textContent = "Failed";
+                        showToast("Save failed: " + (err.detail || "Unknown"), "error");
+                    }
+                } catch (e) {
+                    btn.textContent = "Error";
+                    showToast("Save error: " + e.message, "error");
+                }
+            });
+        });
     }
 
-    // Poll device state every 3 seconds
+    // Poll device state every 5 seconds
     setInterval(async function () {
         try {
             var res = await fetch("/api/devices");
@@ -607,7 +650,7 @@
             renderDeviceList(data.connected);
             renderVulnLog(data.vulns);
         } catch (e) { /* ignore */ }
-    }, 3000);
+    }, 5000);
 
     // ====================================================================
     // Init
