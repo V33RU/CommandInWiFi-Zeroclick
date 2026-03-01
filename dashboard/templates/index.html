@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CommandInWiFi Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css?v=5">
+</head>
+<body>
+    <header>
+        <h1>CommandInWiFi <span class="subtitle">// Zero-Click SSID Injection</span></h1>
+        <nav id="tabs">
+            <button class="tab active" data-panel="payloads">Payloads</button>
+            <button class="tab" data-panel="results">Results Matrix</button>
+            <button class="tab" data-panel="serial">Serial Monitor</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Payload Manager -->
+        <section id="panel-payloads" class="panel active">
+            <div class="toolbar">
+                <select id="category-filter">
+                    <option value="">All Categories</option>
+                    <option value="wifi_cmd">Command Injection</option>
+                    <option value="wifi_overflow">Overflow / Fuzzing</option>
+                    <option value="wifi_fmt">Format String</option>
+                    <option value="wifi_probe">Probe / Malformed</option>
+                    <option value="wifi_esc">Terminal Escape</option>
+                    <option value="wifi_serial">Serialization Inject</option>
+                    <option value="wifi_enc">Encoding Attack</option>
+                    <option value="wifi_chain">Multi-SSID Chain</option>
+                    <option value="wifi_heap">Memory Corruption</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <button id="btn-add-payload" class="btn-primary">+ Add Payload</button>
+            </div>
+            <div class="deploy-toolbar">
+                <button id="btn-deploy" class="btn-deploy" disabled>Deploy Selected (0)</button>
+                <button id="btn-stop-esp" class="btn-stop">Stop ESP</button>
+                <span id="esp-status" class="esp-badge idle">ESP: Idle</span>
+            </div>
+            <table id="payloads-table">
+                <thead>
+                    <tr>
+                        <th class="th-check"><input type="checkbox" id="select-all"></th>
+                        <th>Payload</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="payloads-body"></tbody>
+            </table>
+
+            <div id="payload-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h3 id="modal-title">Add Payload</h3>
+                    <input type="hidden" id="modal-payload-id">
+                    <label>Payload Text (SSID)
+                        <input type="text" id="modal-text" maxlength="32" placeholder="|reboot|">
+                    </label>
+                    <label>Category
+                        <select id="modal-category">
+                            <option value="wifi_cmd">Command Injection</option>
+                            <option value="wifi_overflow">Overflow / Fuzzing</option>
+                            <option value="wifi_fmt">Format String</option>
+                            <option value="wifi_probe">Probe / Malformed</option>
+                            <option value="wifi_esc">Terminal Escape</option>
+                            <option value="wifi_serial">Serialization Inject</option>
+                            <option value="wifi_enc">Encoding Attack</option>
+                            <option value="wifi_chain">Multi-SSID Chain</option>
+                            <option value="wifi_heap">Memory Corruption</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <label>Description
+                        <textarea id="modal-description" rows="2"></textarea>
+                    </label>
+                    <div class="modal-actions">
+                        <button id="modal-save" class="btn-primary">Save</button>
+                        <button id="modal-cancel" class="btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results Matrix -->
+        <section id="panel-results" class="panel hidden">
+            <div class="toolbar">
+                <button id="btn-add-result" class="btn-primary">+ Record Result</button>
+                <button id="btn-refresh-matrix" class="btn-secondary">Refresh</button>
+            </div>
+            <div id="matrix-container">
+                <p class="muted">No test results yet. Record your first result.</p>
+            </div>
+
+            <div id="result-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h3>Record Test Result</h3>
+                    <label>Payload
+                        <select id="result-payload"></select>
+                    </label>
+                    <label>Device Name
+                        <input type="text" id="result-device-name" placeholder="e.g. Philips Hue Bridge">
+                    </label>
+                    <label>Device MAC
+                        <input type="text" id="result-device-mac" placeholder="AA:BB:CC:DD:EE:FF">
+                    </label>
+                    <label>Status
+                        <select id="result-status">
+                            <option value="crashed">Crashed</option>
+                            <option value="rebooted">Rebooted</option>
+                            <option value="survived">Survived</option>
+                            <option value="unknown">Unknown</option>
+                        </select>
+                    </label>
+                    <label>Notes
+                        <textarea id="result-notes" rows="2"></textarea>
+                    </label>
+                    <div class="modal-actions">
+                        <button id="result-save" class="btn-primary">Save</button>
+                        <button id="result-cancel" class="btn-secondary">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Serial Monitor -->
+        <section id="panel-serial" class="panel hidden">
+            <div class="toolbar">
+                <select id="serial-port">
+                    <option value="">No ports found</option>
+                </select>
+                <select id="serial-baud">
+                    <option value="9600">9600</option>
+                    <option value="115200" selected>115200</option>
+                </select>
+                <button id="btn-serial-connect" class="btn-primary">Connect</button>
+                <button id="btn-serial-disconnect" class="btn-secondary" disabled>Disconnect</button>
+                <button id="btn-serial-clear" class="btn-secondary">Clear</button>
+                <button id="btn-flash-firmware" class="btn-flash">Flash Firmware</button>
+                <span id="serial-status" class="status-badge disconnected">Disconnected</span>
+            </div>
+            <pre id="serial-output" class="terminal"></pre>
+            <div class="serial-input-row">
+                <input type="text" id="serial-input" placeholder="Send command to ESP..." disabled>
+                <button id="btn-serial-send" class="btn-primary" disabled>Send</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js?v=5"></script>
+</body>
+</html>
