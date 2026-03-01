@@ -24,7 +24,7 @@
 
 > As part of this work, no direct RCE payloads have been added to the framework.
 >
-> CommandInWiFi currently focuses on SSID parsing instability, crash detection, reboot detection, and behavioral anomaly analysis — not confirmed remote code execution.
+> CommandInWiFi currently focuses on SSID parsing instability, crash detection, reboot detection, and behavioral anomaly analysis , not confirmed remote code execution.
 >
 > If a validated RCE-class payload were ever introduced and responsibly proven in a controlled environment, that would satisfy the strict definition of zero-click exploitation. Until then, detection does not equal exploitation.
 >
@@ -32,7 +32,7 @@
 >
 > As the project supports custom commands, researchers may add their own logic independently.
 >
-> Hints and research direction only — not babysitting.
+> Hints and research direction only , not babysitting.
 >
 > Hunt beyond limits.
 
