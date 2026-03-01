@@ -464,17 +464,19 @@
     // Flash Firmware button
     document.getElementById("btn-flash-firmware").addEventListener("click", async function () {
         var port = document.getElementById("serial-port").value;
+        var board = document.getElementById("board-select").value;
         if (!port) {
             showToast("Select a serial port first", "error");
             return;
         }
-        if (!confirm("Flash CommandInWiFi firmware to ESP on " + port + "?\n\nThis will compile and upload the firmware. The ESP will reboot after flashing.")) {
+        var boardLabel = board === "esp32" ? "ESP32" : "ESP8266";
+        if (!confirm("Flash CommandInWiFi firmware to " + boardLabel + " on " + port + "?\n\nThis will compile and upload the firmware. The ESP will reboot after flashing.")) {
             return;
         }
 
         var btn = document.getElementById("btn-flash-firmware");
         btn.disabled = true;
-        btn.textContent = "Flashing...";
+        btn.textContent = "Flashing " + boardLabel + "...";
 
         // Ensure WebSocket is open to see progress
         connectWebSocket();
@@ -483,7 +485,7 @@
             var res = await fetch("/api/firmware/flash", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ port: port }),
+                body: JSON.stringify({ port: port, board: board }),
             });
             var data = await res.json();
 
