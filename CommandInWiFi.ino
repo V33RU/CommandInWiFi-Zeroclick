@@ -24,6 +24,15 @@ int queueCount = 0;
 bool isRunning = false;
 bool useDashboard = false;  // true once first CIW command received
 
+// Track current SSID for device event correlation
+String currentSSID = "";
+
+// ESP8266 event handlers (must be global — RAII prevents local scope)
+#ifndef ESP32
+WiFiEventHandler stationConnectedHandler;
+WiFiEventHandler stationDisconnectedHandler;
+#endif
+
 // Open AP (no password) — SSIDs must be visible to all scanning devices
 // Index to track the current SSID
 unsigned int ssidIndex = 0;
@@ -79,6 +88,54 @@ void setup() {
   Serial.println("Waiting for dashboard commands or using default SSIDs...");
 
   WiFi.mode(WIFI_AP);
+
+  // Register WiFi event callbacks for real-time device tracking
+#ifdef ESP32
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+    char mac[18];
+    uint8_t* m = info.wifi_ap_staconnected.mac;
+    snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+             m[0], m[1], m[2], m[3], m[4], m[5]);
+    Serial.print("CIW:STA_CONNECT:");
+    Serial.print(mac);
+    Serial.print(":");
+    Serial.println(currentSSID);
+  }, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
+
+  WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+    char mac[18];
+    uint8_t* m = info.wifi_ap_stadisconnected.mac;
+    snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+             m[0], m[1], m[2], m[3], m[4], m[5]);
+    Serial.print("CIW:STA_DISCONNECT:");
+    Serial.print(mac);
+    Serial.print(":");
+    Serial.println(currentSSID);
+  }, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
+#else
+  stationConnectedHandler = WiFi.onSoftAPModeStationConnected(
+    [](const WiFiEventSoftAPModeStationConnected& evt) {
+      char mac[18];
+      snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+               evt.mac[0], evt.mac[1], evt.mac[2], evt.mac[3], evt.mac[4], evt.mac[5]);
+      Serial.print("CIW:STA_CONNECT:");
+      Serial.print(mac);
+      Serial.print(":");
+      Serial.println(currentSSID);
+    });
+
+  stationDisconnectedHandler = WiFi.onSoftAPModeStationDisconnected(
+    [](const WiFiEventSoftAPModeStationDisconnected& evt) {
+      char mac[18];
+      snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+               evt.mac[0], evt.mac[1], evt.mac[2], evt.mac[3], evt.mac[4], evt.mac[5]);
+      Serial.print("CIW:STA_DISCONNECT:");
+      Serial.print(mac);
+      Serial.print(":");
+      Serial.println(currentSSID);
+    });
+#endif
+
   changeSSID();
   isRunning = true;
   Serial.println("Setup completed. Broadcasting default SSIDs.");
@@ -184,6 +241,7 @@ void changeSSID() {
     newSSID = defaultSSIDs[ssidIndex % defaultCount];
   }
 
+  currentSSID = String(newSSID);
   WiFi.softAP(newSSID);
 
   Serial.println("-------------------------------------------------");
