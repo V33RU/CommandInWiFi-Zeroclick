@@ -29,7 +29,7 @@ CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to test how ne
 - **Leak memory** via format string specifiers in SSID
 - **Corrupt config files** via serialization injection in stored SSIDs
 
-The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, and recording test results — all from your browser.
+The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, and recording test results - all from your browser.
 
 <p align="center">
   <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi PoC" width="600"/>
@@ -40,13 +40,13 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
 ## Features
 
 - **95 payloads** across 9 attack categories (pre-loaded)
-- **Web Dashboard** — manage payloads, deploy to ESP, monitor serial, record results
-- **One-Click Flash** — compile and flash firmware to ESP32/ESP8266 from the dashboard
-- **Real-Time Serial Monitor** — see CIW protocol messages, deploy progress, ESP output live
-- **Results Matrix** — track which payloads crash/reboot which devices
-- **CIW Protocol** — custom serial protocol for remote payload deployment
-- **Open AP** — SSIDs broadcast without password for maximum visibility
-- **Cross-Platform Firmware** — single codebase supports both ESP32 and ESP8266
+- **Web Dashboard** - manage payloads, deploy to ESP, monitor serial, record results
+- **One-Click Flash** - compile and flash firmware to ESP32/ESP8266 from the dashboard
+- **Real-Time Serial Monitor** - see CIW protocol messages, deploy progress, ESP output live
+- **Results Matrix** - track which payloads crash/reboot which devices
+- **CIW Protocol** - custom serial protocol for remote payload deployment
+- **Open AP** - SSIDs broadcast without password for maximum visibility
+- **Cross-Platform Firmware** - single codebase supports both ESP32 and ESP8266
 
 ---
 
@@ -74,7 +74,6 @@ CommandInWiFi-Zeroclick/
 │       └── style.css          # Dark theme styles
 ├── poc/                       # Proof-of-concept screenshots
 ├── LICENSE                    # MIT License
-└── .gitignore
 ```
 
 ---
@@ -121,12 +120,12 @@ Open **http://localhost:8000** in your browser.
 1. Go to **Payloads** tab
 2. Select payloads (click rows or use Select All)
 3. Click **Deploy Selected**
-4. Dashboard switches to Serial Monitor — watch the ESP receive and broadcast
+4. Dashboard switches to Serial Monitor - watch the ESP receive and broadcast
 
 ### 5. Monitor Results
 
-- **Serial Monitor** — see live ESP output (SSID changes, connected devices)
-- **Results Matrix** — record which payloads cause crashes/reboots on target devices
+- **Serial Monitor** - see live ESP output (SSID changes, connected devices)
+- **Results Matrix** - record which payloads cause crashes/reboots on target devices
 
 ---
 
@@ -204,7 +203,7 @@ The MicroPython version supports the same CIW protocol and works with the dashbo
 <p align="center">
   <img src="poc/ssid-changing.png" alt="SSID Changing" width="500"/>
 </p>
-<p align="center"><em>ESP broadcasting crafted SSIDs — visible in WiFi scanner</em></p>
+<p align="center"><em>ESP broadcasting crafted SSIDs - visible in WiFi scanner</em></p>
 
 <p align="center">
   <img src="poc/expecte-output.png" alt="Expected Output" width="500"/>
