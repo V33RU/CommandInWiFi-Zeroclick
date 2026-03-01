@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import subprocess
 import time
 from pathlib import Path
 
@@ -12,6 +11,7 @@ from fastapi import WebSocket
 
 
 CRASH_THRESHOLD = 10  # seconds — disconnect faster than this = likely crash
+VULN_COOLDOWN = 30    # seconds — don't re-report same device within this window
 
 
 class SerialManager:
@@ -27,7 +27,9 @@ class SerialManager:
         self.current_ssid: str = ""
         self.last_ssid_change: float = 0.0
         self.devices: dict[str, dict] = {}  # mac -> {connected_at, ssid}
-        self.device_events: list[dict] = []  # event log (last 100)
+        self.device_events: list[dict] = []  # event log (last 200)
+        # Vuln throttle: mac -> last_reported_time
+        self._vuln_reported: dict[str, float] = {}
 
     def list_ports(self) -> list[dict]:
         return [
@@ -60,14 +62,8 @@ class SerialManager:
             try:
                 line = await loop.run_in_executor(None, self._read_line)
                 if line:
-                    events_before = len(self.device_events)
-                    # Parse CIW protocol responses for status tracking
                     self._parse_ciw_response(line)
                     await self._broadcast(line)
-                    # Broadcast alerts for new device events
-                    if len(self.device_events) > events_before:
-                        await self._broadcast_device_alert(
-                            self.device_events[-1])
             except asyncio.CancelledError:
                 break
             except serial.SerialException:
@@ -90,7 +86,7 @@ class SerialManager:
         elif line.startswith("CIW:STATUS:"):
             parts = line.split(":")
             if len(parts) >= 4:
-                self.deploy_status = parts[2]  # running or stopped
+                self.deploy_status = parts[2]
                 try:
                     self.deploy_count = int(parts[3])
                 except (IndexError, ValueError):
@@ -103,64 +99,37 @@ class SerialManager:
         elif line.startswith("CIW:STA_DISCONNECT:"):
             self._handle_device_disconnect(line[19:])
 
-    def _handle_device_connect(self, data: str) -> None:
-        """Track device connection and log event."""
-        parts = data.split(":", 1)
-        mac = parts[0]
-        ssid = parts[1] if len(parts) > 1 else self.current_ssid
-        now = time.time()
+    @staticmethod
+    def _parse_mac_ssid(data: str) -> tuple[str, str]:
+        """Parse 'MAC|SSID' from firmware data.
 
-        # Check if this is a reconnect (same MAC seen before recently)
-        reconnect = False
-        for evt in reversed(self.device_events):
-            if evt["mac"] == mac and evt["type"] == "disconnect":
-                gap = now - evt["time"]
-                if gap < 30:
-                    reconnect = True
-                break
+        The firmware uses pipe (|) as separator between MAC and SSID
+        because MACs contain colons.
+        """
+        idx = data.find("|")
+        if idx > 0:
+            return data[:idx], data[idx + 1:]
+        # Fallback: no pipe found, treat entire string as MAC
+        return data, ""
+
+    def _handle_device_connect(self, data: str) -> None:
+        """Track device connection."""
+        mac, ssid = self._parse_mac_ssid(data)
+        if not ssid:
+            ssid = self.current_ssid
+        now = time.time()
 
         self.devices[mac] = {"connected_at": now, "ssid": ssid}
         event = {
-            "type": "connect", "mac": mac, "ssid": ssid,
-            "time": now, "reconnect": reconnect,
+            "type": "connect", "mac": mac, "ssid": ssid, "time": now,
         }
         self._push_event(event)
 
-    async def _broadcast_device_alert(self, event: dict) -> None:
-        """Broadcast vulnerability detection alerts."""
-        if event["type"] == "disconnect" and event.get("vuln"):
-            vuln = event["vuln"]
-            mac = event["mac"]
-            ssid = event["ssid"]
-            dur = event.get("duration", 0)
-            if vuln == "crash":
-                msg = (f"[VULN] Device {mac} disconnected after {dur:.1f}s "
-                       f"on SSID \"{ssid}\" — POSSIBLE CRASH")
-                await self._broadcast(msg)
-            elif vuln == "reboot":
-                msg = (f"[VULN] Device {mac} reconnected after crash "
-                       f"on SSID \"{ssid}\" — CONFIRMED REBOOT")
-                await self._broadcast(msg)
-        elif event["type"] == "connect":
-            mac = event["mac"]
-            ssid = event["ssid"]
-            if event.get("reconnect"):
-                await self._broadcast(
-                    f"[DEVICE] {mac} reconnected (SSID: \"{ssid}\")")
-            else:
-                await self._broadcast(
-                    f"[DEVICE] {mac} connected (SSID: \"{ssid}\")")
-        elif event["type"] == "disconnect" and not event.get("ssid_rotation"):
-            mac = event["mac"]
-            dur = event.get("duration", 0)
-            await self._broadcast(
-                f"[DEVICE] {mac} disconnected after {dur:.1f}s")
-
     def _handle_device_disconnect(self, data: str) -> None:
-        """Track device disconnection and detect vulnerability patterns."""
-        parts = data.split(":", 1)
-        mac = parts[0]
-        ssid = parts[1] if len(parts) > 1 else self.current_ssid
+        """Track device disconnection and detect vulnerability (time-based)."""
+        mac, ssid = self._parse_mac_ssid(data)
+        if not ssid:
+            ssid = self.current_ssid
         now = time.time()
 
         duration = 0.0
@@ -170,28 +139,22 @@ class SerialManager:
             connect_ssid = self.devices[mac]["ssid"]
             del self.devices[mac]
 
-        # Check if disconnect is due to SSID rotation (expected behavior)
-        ssid_rotation = (now - self.last_ssid_change) < 5.0
+        # Ignore disconnects caused by SSID rotation (expected)
+        if (now - self.last_ssid_change) < 5.0:
+            return
 
         event: dict = {
             "type": "disconnect", "mac": mac, "ssid": connect_ssid,
             "time": now, "duration": round(duration, 1),
-            "ssid_rotation": ssid_rotation,
         }
 
-        # Vulnerability detection (only flag if NOT an SSID rotation disconnect)
-        if not ssid_rotation and duration > 0:
-            if duration < CRASH_THRESHOLD:
-                # Check if this MAC previously reconnected (confirms reboot)
-                was_reconnect = False
-                for prev in reversed(self.device_events):
-                    if prev["mac"] == mac and prev["type"] == "connect":
-                        was_reconnect = prev.get("reconnect", False)
-                        break
-                if was_reconnect:
-                    event["vuln"] = "reboot"
-                else:
-                    event["vuln"] = "crash"
+        # Time-based vulnerability detection
+        if duration > 0 and duration < CRASH_THRESHOLD:
+            # Throttle: don't spam alerts for same device
+            last_reported = self._vuln_reported.get(mac, 0)
+            if (now - last_reported) > VULN_COOLDOWN:
+                event["vuln"] = "crash"
+                self._vuln_reported[mac] = now
 
         self._push_event(event)
 
@@ -240,37 +203,30 @@ class SerialManager:
         self.deploy_status = "deploying"
         self.deploy_count = total
 
-        # Show deploy start in serial monitor
         await self._broadcast(f"[DEPLOY] Starting deploy of {total} payload(s) to ESP...")
-        await self._broadcast("[DEPLOY] >> CIW:CLEAR")
 
-        # Clear existing queue
         self.send_command("CIW:CLEAR")
         await asyncio.sleep(0.15)
 
-        # Add each payload (base64 encoded for safe transport)
         for i, text in enumerate(payload_texts, 1):
             encoded = base64.b64encode(text.encode("utf-8", errors="replace")).decode("ascii")
             await self._broadcast(f"[DEPLOY] Sending payload {i}/{total}: {text}")
             self.send_command("CIW:ADD:" + encoded)
             await asyncio.sleep(0.05)
 
-        # Start broadcasting
-        await self._broadcast("[DEPLOY] >> CIW:START")
         self.send_command("CIW:START")
         await asyncio.sleep(0.15)
 
         self.deploy_status = "broadcasting"
-        await self._broadcast(f"[DEPLOY] ESP is now broadcasting {total} payload(s) as WiFi SSIDs")
+        await self._broadcast(f"[DEPLOY] ESP broadcasting {total} payload(s)")
 
         return {"ok": True, "count": total}
 
     async def stop_esp(self) -> None:
         """Send stop command to ESP."""
-        await self._broadcast("[DEPLOY] >> CIW:STOP")
         self.send_command("CIW:STOP")
         self.deploy_status = "stopped"
-        await self._broadcast("[DEPLOY] ESP stopped broadcasting")
+        await self._broadcast("[DEPLOY] ESP stopped")
 
     async def request_status(self) -> None:
         """Request status from ESP."""
@@ -280,24 +236,19 @@ class SerialManager:
         """Compile and flash CommandInWiFi firmware to ESP via PlatformIO."""
         project_root = Path(__file__).resolve().parent.parent
 
-        # Map board name to PlatformIO environment
         env = "esp32" if board == "esp32" else "esp8266"
 
-        # Check platformio.ini exists
         if not (project_root / "platformio.ini").exists():
             return {"ok": False, "error": "platformio.ini not found in project root"}
 
-        # Disconnect serial first (esptool needs exclusive port access)
         saved_port = self.port
         saved_baud = self.baud
         await self.stop()
         await self._broadcast("[FLASH] Disconnected serial for firmware upload")
 
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
-        await self._broadcast(f"[FLASH] Compiling CommandInWiFi firmware for {board}...")
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
+        await self._broadcast(f"[FLASH] Compiling for {board}...")
 
-        # Step 1: Compile for the selected board
+        # Step 1: Compile
         try:
             proc = await asyncio.create_subprocess_exec(
                 "pio", "run", "-e", env,
@@ -323,10 +274,8 @@ class SerialManager:
             await self._broadcast("[FLASH] ERROR: PlatformIO CLI (pio) not found. Install with: pip install platformio")
             return {"ok": False, "error": "PlatformIO not installed"}
 
-        # Step 2: Flash the selected board
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
-        await self._broadcast(f"[FLASH] Flashing {board} firmware to {port}...")
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
+        # Step 2: Flash
+        await self._broadcast(f"[FLASH] Flashing {board} on {port}...")
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -346,23 +295,20 @@ class SerialManager:
             await proc.wait()
 
             if proc.returncode != 0:
-                await self._broadcast("[FLASH] ERROR: Flash failed! Check connection and port.")
+                await self._broadcast("[FLASH] ERROR: Flash failed!")
                 return {"ok": False, "error": "Flash failed"}
 
         except FileNotFoundError:
             await self._broadcast("[FLASH] ERROR: PlatformIO CLI not found")
             return {"ok": False, "error": "PlatformIO not installed"}
 
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
-        await self._broadcast("[FLASH] Firmware flashed successfully!")
-        await self._broadcast("[FLASH] ESP is rebooting...")
-        await self._broadcast("[FLASH] ══════════════════════════════════════")
+        await self._broadcast("[FLASH] Firmware flashed successfully! ESP rebooting...")
 
-        # Step 3: Reconnect serial after flash
-        await asyncio.sleep(2)  # Wait for ESP to reboot
+        # Step 3: Reconnect serial
+        await asyncio.sleep(2)
         try:
             await self.connect(port, saved_baud or 115200)
-            await self._broadcast("[FLASH] Serial reconnected. Waiting for CIW:BOOT...")
+            await self._broadcast("[FLASH] Serial reconnected.")
         except Exception as e:
             await self._broadcast(f"[FLASH] Could not reconnect serial: {e}")
 
