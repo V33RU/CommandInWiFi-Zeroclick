@@ -72,6 +72,7 @@ class DeployRequest(BaseModel):
 
 class FlashRequest(BaseModel):
     port: str
+    board: str = "esp32"  # "esp32" or "esp8266"
 
 
 # -- Payload CRUD ----------------------------------------------------------
@@ -283,7 +284,10 @@ def deploy_status():
 async def flash_firmware(req: FlashRequest):
     if not req.port:
         raise HTTPException(400, "No port specified")
-    result = await serial_manager.flash_firmware(req.port)
+    valid_boards = ("esp32", "esp8266")
+    if req.board not in valid_boards:
+        raise HTTPException(400, f"Invalid board. Must be one of: {valid_boards}")
+    result = await serial_manager.flash_firmware(req.port, req.board)
     if not result["ok"]:
         raise HTTPException(400, result.get("error", "Flash failed"))
     return {"ok": True}
