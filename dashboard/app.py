@@ -288,7 +288,6 @@ def get_devices():
         {"mac": mac, "ssid": info["ssid"], "connected_at": info["connected_at"]}
         for mac, info in serial_manager.devices.items()
     ]
-    # Only return vulnerability-flagged events for the alerts panel
     vuln_events = [
         e for e in serial_manager.device_events if e.get("vuln")
     ]
@@ -298,6 +297,42 @@ def get_devices():
         "vulns": vuln_events[-20:],
         "current_ssid": serial_manager.current_ssid,
     }
+
+
+class VulnSaveRequest(BaseModel):
+    mac: str
+    ssid: str
+    vuln_type: str  # crash, reboot
+
+
+@app.post("/api/devices/save-result", status_code=201)
+def save_vuln_result(req: VulnSaveRequest):
+    """Auto-save a detected vulnerability to the results table."""
+    conn = get_db()
+    payload = conn.execute(
+        "SELECT * FROM payloads WHERE text = ?", (req.ssid,)
+    ).fetchone()
+    if not payload:
+        conn.close()
+        raise HTTPException(404, f"No payload matches SSID: {req.ssid}")
+
+    status_map = {"crash": "crashed", "reboot": "rebooted"}
+    status = status_map.get(req.vuln_type, "unknown")
+    notes = f"Auto-detected — {req.vuln_type}"
+
+    cur = conn.execute(
+        "INSERT INTO results (payload_id, device_name, device_mac, status, notes) VALUES (?, ?, ?, ?, ?)",
+        (payload["id"], f"Device {req.mac}", req.mac, status, notes),
+    )
+    conn.commit()
+    row = conn.execute(
+        """SELECT r.*, p.text as payload_text
+           FROM results r JOIN payloads p ON r.payload_id = p.id
+           WHERE r.id = ?""",
+        (cur.lastrowid,),
+    ).fetchone()
+    conn.close()
+    return dict(row)
 
 
 @app.post("/api/firmware/flash")
