@@ -11,6 +11,9 @@ import serial.tools.list_ports
 from fastapi import WebSocket
 
 
+CRASH_THRESHOLD = 10  # seconds — disconnect faster than this = likely crash
+
+
 class SerialManager:
     def __init__(self) -> None:
         self.port: str | None = None
@@ -20,6 +23,11 @@ class SerialManager:
         self._task: asyncio.Task | None = None
         self.deploy_status: str = "idle"  # idle, deploying, broadcasting, stopped
         self.deploy_count: int = 0
+        # Device tracking
+        self.current_ssid: str = ""
+        self.last_ssid_change: float = 0.0
+        self.devices: dict[str, dict] = {}  # mac -> {connected_at, ssid}
+        self.device_events: list[dict] = []  # event log (last 100)
 
     def list_ports(self) -> list[dict]:
         return [
@@ -52,9 +60,14 @@ class SerialManager:
             try:
                 line = await loop.run_in_executor(None, self._read_line)
                 if line:
+                    events_before = len(self.device_events)
                     # Parse CIW protocol responses for status tracking
                     self._parse_ciw_response(line)
                     await self._broadcast(line)
+                    # Broadcast alerts for new device events
+                    if len(self.device_events) > events_before:
+                        await self._broadcast_device_alert(
+                            self.device_events[-1])
             except asyncio.CancelledError:
                 break
             except serial.SerialException:
@@ -62,7 +75,7 @@ class SerialManager:
                 break
 
     def _parse_ciw_response(self, line: str) -> None:
-        """Track deploy state from ESP responses."""
+        """Track deploy state and device events from ESP responses."""
         if line.startswith("CIW:OK:START:"):
             self.deploy_status = "broadcasting"
             try:
@@ -82,6 +95,111 @@ class SerialManager:
                     self.deploy_count = int(parts[3])
                 except (IndexError, ValueError):
                     pass
+        elif line.startswith("CIW:SSID:"):
+            self.current_ssid = line[9:]
+            self.last_ssid_change = time.time()
+        elif line.startswith("CIW:STA_CONNECT:"):
+            self._handle_device_connect(line[16:])
+        elif line.startswith("CIW:STA_DISCONNECT:"):
+            self._handle_device_disconnect(line[19:])
+
+    def _handle_device_connect(self, data: str) -> None:
+        """Track device connection and log event."""
+        parts = data.split(":", 1)
+        mac = parts[0]
+        ssid = parts[1] if len(parts) > 1 else self.current_ssid
+        now = time.time()
+
+        # Check if this is a reconnect (same MAC seen before recently)
+        reconnect = False
+        for evt in reversed(self.device_events):
+            if evt["mac"] == mac and evt["type"] == "disconnect":
+                gap = now - evt["time"]
+                if gap < 30:
+                    reconnect = True
+                break
+
+        self.devices[mac] = {"connected_at": now, "ssid": ssid}
+        event = {
+            "type": "connect", "mac": mac, "ssid": ssid,
+            "time": now, "reconnect": reconnect,
+        }
+        self._push_event(event)
+
+    async def _broadcast_device_alert(self, event: dict) -> None:
+        """Broadcast vulnerability detection alerts."""
+        if event["type"] == "disconnect" and event.get("vuln"):
+            vuln = event["vuln"]
+            mac = event["mac"]
+            ssid = event["ssid"]
+            dur = event.get("duration", 0)
+            if vuln == "crash":
+                msg = (f"[VULN] Device {mac} disconnected after {dur:.1f}s "
+                       f"on SSID \"{ssid}\" — POSSIBLE CRASH")
+                await self._broadcast(msg)
+            elif vuln == "reboot":
+                msg = (f"[VULN] Device {mac} reconnected after crash "
+                       f"on SSID \"{ssid}\" — CONFIRMED REBOOT")
+                await self._broadcast(msg)
+        elif event["type"] == "connect":
+            mac = event["mac"]
+            ssid = event["ssid"]
+            if event.get("reconnect"):
+                await self._broadcast(
+                    f"[DEVICE] {mac} reconnected (SSID: \"{ssid}\")")
+            else:
+                await self._broadcast(
+                    f"[DEVICE] {mac} connected (SSID: \"{ssid}\")")
+        elif event["type"] == "disconnect" and not event.get("ssid_rotation"):
+            mac = event["mac"]
+            dur = event.get("duration", 0)
+            await self._broadcast(
+                f"[DEVICE] {mac} disconnected after {dur:.1f}s")
+
+    def _handle_device_disconnect(self, data: str) -> None:
+        """Track device disconnection and detect vulnerability patterns."""
+        parts = data.split(":", 1)
+        mac = parts[0]
+        ssid = parts[1] if len(parts) > 1 else self.current_ssid
+        now = time.time()
+
+        duration = 0.0
+        connect_ssid = ssid
+        if mac in self.devices:
+            duration = now - self.devices[mac]["connected_at"]
+            connect_ssid = self.devices[mac]["ssid"]
+            del self.devices[mac]
+
+        # Check if disconnect is due to SSID rotation (expected behavior)
+        ssid_rotation = (now - self.last_ssid_change) < 5.0
+
+        event: dict = {
+            "type": "disconnect", "mac": mac, "ssid": connect_ssid,
+            "time": now, "duration": round(duration, 1),
+            "ssid_rotation": ssid_rotation,
+        }
+
+        # Vulnerability detection (only flag if NOT an SSID rotation disconnect)
+        if not ssid_rotation and duration > 0:
+            if duration < CRASH_THRESHOLD:
+                # Check if this MAC previously reconnected (confirms reboot)
+                was_reconnect = False
+                for prev in reversed(self.device_events):
+                    if prev["mac"] == mac and prev["type"] == "connect":
+                        was_reconnect = prev.get("reconnect", False)
+                        break
+                if was_reconnect:
+                    event["vuln"] = "reboot"
+                else:
+                    event["vuln"] = "crash"
+
+        self._push_event(event)
+
+    def _push_event(self, event: dict) -> None:
+        """Add event to log, keeping last 200 entries."""
+        self.device_events.append(event)
+        if len(self.device_events) > 200:
+            self.device_events = self.device_events[-200:]
 
     def _read_line(self) -> str | None:
         if self.serial_conn and self.serial_conn.is_open and self.serial_conn.in_waiting:
