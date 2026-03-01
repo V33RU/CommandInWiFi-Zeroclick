@@ -32,7 +32,7 @@
 >
 > As the project supports custom commands, researchers may add their own logic independently.
 >
-> Hints and research direction only , not babysitting.
+> Hints and research direction purpose only .
 >
 > Hunt beyond limits.
 
