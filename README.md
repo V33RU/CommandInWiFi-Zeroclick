@@ -31,11 +31,12 @@ CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to test how ne
 
 The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, real-time device tracking, automated vulnerability detection, and recording test results - all from your browser.
 
+![PoC Demo](poc/demo.gif)
+
 <p align="center">
   <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi PoC" width="600"/>
 </p>
 
-<img src="assets/demo.gif" width="700"/>
 
 ---
 
