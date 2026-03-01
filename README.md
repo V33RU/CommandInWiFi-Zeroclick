@@ -35,8 +35,9 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
   <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi PoC" width="600"/>
 </p>
 
----
 <img src="assets/demo.gif" width="700"/>
+
+---
 
 ## Architecture Workflow
 
