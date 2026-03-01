@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CommandInWiFi Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=5">
+    <link rel="stylesheet" href="/static/style.css?v=6">
 </head>
 <body>
     <header>
@@ -139,6 +139,10 @@
                 <button id="btn-serial-connect" class="btn-primary">Connect</button>
                 <button id="btn-serial-disconnect" class="btn-secondary" disabled>Disconnect</button>
                 <button id="btn-serial-clear" class="btn-secondary">Clear</button>
+                <select id="board-select">
+                    <option value="esp32">ESP32</option>
+                    <option value="esp8266">ESP8266</option>
+                </select>
                 <button id="btn-flash-firmware" class="btn-flash">Flash Firmware</button>
                 <span id="serial-status" class="status-badge disconnected">Disconnected</span>
             </div>
@@ -150,6 +154,6 @@
         </section>
     </main>
 
-    <script src="/static/app.js?v=5"></script>
+    <script src="/static/app.js?v=6"></script>
 </body>
 </html>
