@@ -19,6 +19,24 @@
 > This tool is designed for IoT security professionals to evaluate device behavior under abnormal WiFi SSID input conditions. Use ethically, legally, and only on devices you own or have written authorization to test.
 
 ---
+## Research Note
+
+
+> As part of this work, no direct RCE payloads have been added to the framework.
+>
+> CommandInWiFi currently focuses on SSID parsing instability, crash detection, reboot detection, and behavioral anomaly analysis — not confirmed remote code execution.
+>
+> If a validated RCE-class payload were ever introduced and responsibly proven in a controlled environment, that would satisfy the strict definition of zero-click exploitation. Until then, detection does not equal exploitation.
+>
+> This project maintains a clear ethical boundary: no weaponized payloads, no operational exploit chains, no service-enabling commands.
+>
+> As the project supports custom commands, researchers may add their own logic independently.
+>
+> Hints and research direction only — not babysitting.
+>
+> Hunt beyond limits.
+
+---
 
 ## What It Does
 
