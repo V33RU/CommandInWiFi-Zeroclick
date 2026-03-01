@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CommandInWiFi Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=6">
+    <link rel="stylesheet" href="/static/style.css?v=7">
 </head>
 <body>
     <header>
@@ -146,14 +146,38 @@
                 <button id="btn-flash-firmware" class="btn-flash">Flash Firmware</button>
                 <span id="serial-status" class="status-badge disconnected">Disconnected</span>
             </div>
-            <pre id="serial-output" class="terminal"></pre>
-            <div class="serial-input-row">
-                <input type="text" id="serial-input" placeholder="Send command to ESP..." disabled>
-                <button id="btn-serial-send" class="btn-primary" disabled>Send</button>
+            <div class="serial-split">
+                <div class="serial-left">
+                    <pre id="serial-output" class="terminal"></pre>
+                    <div class="serial-input-row">
+                        <input type="text" id="serial-input" placeholder="Send command to ESP..." disabled>
+                        <button id="btn-serial-send" class="btn-primary" disabled>Send</button>
+                    </div>
+                </div>
+                <div class="serial-right">
+                    <div class="device-panel">
+                        <div class="device-panel-header">
+                            <h3>Connected Devices</h3>
+                            <span id="device-count" class="device-count">0</span>
+                        </div>
+                        <div id="device-list" class="device-list">
+                            <p class="muted">No devices connected</p>
+                        </div>
+                    </div>
+                    <div class="vuln-panel">
+                        <div class="vuln-panel-header">
+                            <h3>Vulnerability Alerts</h3>
+                            <span id="vuln-count" class="vuln-count">0</span>
+                        </div>
+                        <div id="vuln-log" class="vuln-log">
+                            <p class="muted">No vulnerabilities detected yet</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </main>
 
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/app.js?v=7"></script>
 </body>
 </html>
