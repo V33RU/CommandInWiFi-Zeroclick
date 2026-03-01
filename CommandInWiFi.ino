@@ -33,7 +33,6 @@ WiFiEventHandler stationConnectedHandler;
 WiFiEventHandler stationDisconnectedHandler;
 #endif
 
-// Open AP (no password) — SSIDs must be visible to all scanning devices
 // Index to track the current SSID
 unsigned int ssidIndex = 0;
 
@@ -81,15 +80,16 @@ void setup() {
   while (!Serial) { ; }
   Serial.println("CIW:BOOT");
 #ifdef ESP32
-  Serial.println("CommandInWiFi v2.0 (ESP32) — CIW Protocol Ready");
+  Serial.println("CommandInWiFi v2.1 (ESP32)");
 #else
-  Serial.println("CommandInWiFi v2.0 (ESP8266) — CIW Protocol Ready");
+  Serial.println("CommandInWiFi v2.1 (ESP8266)");
 #endif
-  Serial.println("Waiting for dashboard commands or using default SSIDs...");
 
   WiFi.mode(WIFI_AP);
 
   // Register WiFi event callbacks for real-time device tracking
+  // NOTE: separator between MAC and SSID is pipe (|) not colon (:)
+  //       because MACs already contain colons
 #ifdef ESP32
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     char mac[18];
@@ -98,7 +98,7 @@ void setup() {
              m[0], m[1], m[2], m[3], m[4], m[5]);
     Serial.print("CIW:STA_CONNECT:");
     Serial.print(mac);
-    Serial.print(":");
+    Serial.print("|");
     Serial.println(currentSSID);
   }, ARDUINO_EVENT_WIFI_AP_STACONNECTED);
 
@@ -109,7 +109,7 @@ void setup() {
              m[0], m[1], m[2], m[3], m[4], m[5]);
     Serial.print("CIW:STA_DISCONNECT:");
     Serial.print(mac);
-    Serial.print(":");
+    Serial.print("|");
     Serial.println(currentSSID);
   }, ARDUINO_EVENT_WIFI_AP_STADISCONNECTED);
 #else
@@ -120,7 +120,7 @@ void setup() {
                evt.mac[0], evt.mac[1], evt.mac[2], evt.mac[3], evt.mac[4], evt.mac[5]);
       Serial.print("CIW:STA_CONNECT:");
       Serial.print(mac);
-      Serial.print(":");
+      Serial.print("|");
       Serial.println(currentSSID);
     });
 
@@ -131,30 +131,27 @@ void setup() {
                evt.mac[0], evt.mac[1], evt.mac[2], evt.mac[3], evt.mac[4], evt.mac[5]);
       Serial.print("CIW:STA_DISCONNECT:");
       Serial.print(mac);
-      Serial.print(":");
+      Serial.print("|");
       Serial.println(currentSSID);
     });
 #endif
 
   changeSSID();
   isRunning = true;
-  Serial.println("Setup completed. Broadcasting default SSIDs.");
+  Serial.println("CIW:READY");
 }
 
 // ── Main Loop ───────────────────────────────────────────────────────────
 void loop() {
   unsigned long currentMillis = millis();
 
-  // Always check for serial commands (non-blocking)
   checkSerialCommand();
 
-  // SSID cycling
   if (isRunning && currentMillis - lastChangeMillis >= ssidChangeInterval) {
     lastChangeMillis = currentMillis;
     changeSSID();
   }
 
-  // Device listing
   if (currentMillis - lastDeviceListMillis >= deviceListInterval) {
     lastDeviceListMillis = currentMillis;
     listConnectedDevices();
@@ -221,7 +218,6 @@ void processCommand(const String &cmd) {
   }
 }
 
-// ── Get active payload count ────────────────────────────────────────────
 int getActiveCount() {
   return useDashboard ? queueCount : defaultCount;
 }
@@ -244,25 +240,14 @@ void changeSSID() {
   currentSSID = String(newSSID);
   WiFi.softAP(newSSID);
 
-  Serial.println("-------------------------------------------------");
   Serial.print("CIW:SSID:");
   Serial.println(newSSID);
-  Serial.print("SSID Changed: ");
-  Serial.print(newSSID);
-  Serial.print(" | Index: ");
-  Serial.print(ssidIndex);
-  Serial.print(" | Time: ");
-  Serial.print(millis() / 1000);
-  Serial.println("s");
 
   ssidIndex = (ssidIndex + 1) % count;
 }
 
 // ── List connected devices ──────────────────────────────────────────────
 void listConnectedDevices() {
-  Serial.println("-------------------------------------------------");
-  Serial.println("Listing Connected Devices:");
-
 #ifdef ESP32
   wifi_sta_list_t stationList;
   tcpip_adapter_sta_list_t adapterList;
@@ -270,10 +255,7 @@ void listConnectedDevices() {
   esp_wifi_ap_get_sta_list(&stationList);
   tcpip_adapter_get_sta_list(&stationList, &adapterList);
 
-  if (adapterList.num == 0) {
-    Serial.println("No devices connected.");
-    return;
-  }
+  if (adapterList.num == 0) return;
 
   for (int i = 0; i < adapterList.num; i++) {
     tcpip_adapter_sta_info_t station = adapterList.sta[i];
@@ -282,27 +264,17 @@ void listConnectedDevices() {
     snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
              station.mac[0], station.mac[1], station.mac[2],
              station.mac[3], station.mac[4], station.mac[5]);
-    Serial.print("Device - IP: ");
-    Serial.print(ip);
-    Serial.print(", MAC: ");
-    Serial.println(mac);
-    Serial.println("CIW:DEVICE:" + ip + ":" + String(mac));
+    Serial.println("CIW:DEVICE:" + ip + "|" + String(mac));
   }
 #else
   struct station_info *station_list = wifi_softap_get_station_info();
 
-  if (station_list == NULL) {
-    Serial.println("No devices connected.");
-  }
+  if (station_list == NULL) return;
 
   while (station_list != NULL) {
     String ip = IPAddress((&station_list->ip)->addr).toString();
     String mac = macToString(station_list->bssid);
-    Serial.print("Device - IP: ");
-    Serial.print(ip);
-    Serial.print(", MAC: ");
-    Serial.println(mac);
-    Serial.println("CIW:DEVICE:" + ip + ":" + mac);
+    Serial.println("CIW:DEVICE:" + ip + "|" + mac);
     station_list = STAILQ_NEXT(station_list, next);
   }
   wifi_softap_free_station_info();
