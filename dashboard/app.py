@@ -280,6 +280,26 @@ def deploy_status():
     }
 
 
+# -- Device tracking -------------------------------------------------------
+
+@app.get("/api/devices")
+def get_devices():
+    connected = [
+        {"mac": mac, "ssid": info["ssid"], "connected_at": info["connected_at"]}
+        for mac, info in serial_manager.devices.items()
+    ]
+    # Only return vulnerability-flagged events for the alerts panel
+    vuln_events = [
+        e for e in serial_manager.device_events if e.get("vuln")
+    ]
+    return {
+        "connected": connected,
+        "events": serial_manager.device_events[-50:],
+        "vulns": vuln_events[-20:],
+        "current_ssid": serial_manager.current_ssid,
+    }
+
+
 @app.post("/api/firmware/flash")
 async def flash_firmware(req: FlashRequest):
     if not req.port:
