@@ -434,6 +434,65 @@ td code {
     color: var(--accent-green);
 }
 
+/* Scan-crash vuln entry */
+.vuln-entry.vuln-scan-crash {
+    background: rgba(170, 0, 255, 0.1);
+    border-left: 3px solid #bb66ff;
+}
+.vuln-scan-crash .vuln-badge { background: #bb66ff; color: #fff; }
+
+/* Two-line vuln layout */
+.vuln-row-top { display: flex; gap: 6px; align-items: center; }
+.vuln-row-bottom { display: flex; gap: 4px; align-items: center; margin-top: 2px; }
+
+/* Confidence badges */
+.conf-badge {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+}
+.conf-critical { background: var(--accent-red); color: #fff; }
+.conf-high { background: var(--accent-amber); color: #000; }
+.conf-medium { background: rgba(255, 170, 0, 0.3); color: var(--accent-amber); }
+.conf-low { background: rgba(136, 136, 136, 0.3); color: var(--text-secondary); }
+
+/* Device state badges (AP connected vs scanning) */
+.device-state-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+.device-state-badge.connected { background: var(--accent-green); color: #000; }
+.device-state-badge.probing { background: rgba(77, 171, 247, 0.3); color: var(--accent-blue); }
+
+.device-card.device-probing {
+    border-left-color: #555;
+    opacity: 0.7;
+}
+
+/* Save button on vuln entries */
+.vuln-save-btn {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    margin-top: 4px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--bg-elevated);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.vuln-save-btn:hover { background: #2a2a2a; color: var(--text-primary); }
+.vuln-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.vuln-save-btn.saved { color: var(--accent-green); border-color: var(--accent-green); }
+
 /* Status badge */
 .status-badge {
     font-family: var(--font-mono);
