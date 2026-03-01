@@ -519,8 +519,17 @@
         var protocol = location.protocol === "https:" ? "wss:" : "ws:";
         ws = new WebSocket(protocol + "//" + location.host + "/ws/serial");
         ws.onmessage = function (event) {
+            var msg = event.data;
             var output = document.getElementById("serial-output");
-            output.textContent += event.data + "\n";
+
+            // Color-code special messages in terminal
+            if (msg.startsWith("[VULN]")) {
+                output.innerHTML += '<span class="term-vuln">' + escapeHtml(msg) + '</span>\n';
+            } else if (msg.startsWith("[DEVICE]")) {
+                output.innerHTML += '<span class="term-device">' + escapeHtml(msg) + '</span>\n';
+            } else {
+                output.textContent += msg + "\n";
+            }
             output.scrollTop = output.scrollHeight;
         };
         ws.onclose = function () {
@@ -537,6 +546,68 @@
         document.getElementById("serial-input").disabled = !connected;
         document.getElementById("btn-serial-send").disabled = !connected;
     }
+
+    // ====================================================================
+    // Device Tracker
+    // ====================================================================
+    function renderDeviceList(devices) {
+        var container = document.getElementById("device-list");
+        var countEl = document.getElementById("device-count");
+        countEl.textContent = devices.length;
+
+        if (devices.length === 0) {
+            container.innerHTML = '<p class="muted">No devices connected</p>';
+            return;
+        }
+
+        container.innerHTML = devices.map(function (d) {
+            var ago = Math.round((Date.now() / 1000) - d.connected_at);
+            var timeStr = ago < 60 ? ago + "s ago" : Math.round(ago / 60) + "m ago";
+            return (
+                '<div class="device-card">' +
+                '<div class="device-mac">' + escapeHtml(d.mac) + '</div>' +
+                '<div class="device-info">' +
+                '<span class="device-ssid" title="' + escapeHtml(d.ssid) + '">SSID: ' + escapeHtml(truncate(d.ssid, 18)) + '</span>' +
+                '<span class="device-time">' + timeStr + '</span>' +
+                '</div></div>'
+            );
+        }).join("");
+    }
+
+    function renderVulnLog(vulns) {
+        var container = document.getElementById("vuln-log");
+        var countEl = document.getElementById("vuln-count");
+        countEl.textContent = vulns.length;
+
+        if (vulns.length === 0) {
+            container.innerHTML = '<p class="muted">No vulnerabilities detected yet</p>';
+            return;
+        }
+
+        container.innerHTML = vulns.slice().reverse().map(function (v) {
+            var cls = v.vuln === "reboot" ? "vuln-reboot" : "vuln-crash";
+            var label = v.vuln === "reboot" ? "REBOOT" : "CRASH";
+            var dur = v.duration ? v.duration.toFixed(1) + "s" : "?";
+            return (
+                '<div class="vuln-entry ' + cls + '">' +
+                '<span class="vuln-badge">' + label + '</span>' +
+                '<span class="vuln-mac">' + escapeHtml(v.mac) + '</span>' +
+                '<span class="vuln-detail">disconnected after ' + dur +
+                ' on <code>' + escapeHtml(truncate(v.ssid, 16)) + '</code></span>' +
+                '</div>'
+            );
+        }).join("");
+    }
+
+    // Poll device state every 3 seconds
+    setInterval(async function () {
+        try {
+            var res = await fetch("/api/devices");
+            var data = await res.json();
+            renderDeviceList(data.connected);
+            renderVulnLog(data.vulns);
+        } catch (e) { /* ignore */ }
+    }, 3000);
 
     // ====================================================================
     // Init
