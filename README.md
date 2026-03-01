@@ -36,7 +36,7 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
 </p>
 
 ---
-![Demo](poc/demo.gif)
+![Demo](/poc/demo.gif)
 
 ## Architecture Workflow
 
