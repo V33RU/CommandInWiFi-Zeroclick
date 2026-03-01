@@ -158,9 +158,12 @@ class SerialManager:
         """Request status from ESP."""
         self.send_command("CIW:STATUS")
 
-    async def flash_firmware(self, port: str) -> dict:
+    async def flash_firmware(self, port: str, board: str = "esp32") -> dict:
         """Compile and flash CommandInWiFi firmware to ESP via PlatformIO."""
         project_root = Path(__file__).resolve().parent.parent
+
+        # Map board name to PlatformIO environment
+        env = "esp32" if board == "esp32" else "esp8266"
 
         # Check platformio.ini exists
         if not (project_root / "platformio.ini").exists():
@@ -173,13 +176,13 @@ class SerialManager:
         await self._broadcast("[FLASH] Disconnected serial for firmware upload")
 
         await self._broadcast("[FLASH] ══════════════════════════════════════")
-        await self._broadcast("[FLASH] Compiling CommandInWiFi firmware...")
+        await self._broadcast(f"[FLASH] Compiling CommandInWiFi firmware for {board}...")
         await self._broadcast("[FLASH] ══════════════════════════════════════")
 
-        # Step 1: Compile
+        # Step 1: Compile for the selected board
         try:
             proc = await asyncio.create_subprocess_exec(
-                "pio", "run",
+                "pio", "run", "-e", env,
                 cwd=str(project_root),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
@@ -202,14 +205,14 @@ class SerialManager:
             await self._broadcast("[FLASH] ERROR: PlatformIO CLI (pio) not found. Install with: pip install platformio")
             return {"ok": False, "error": "PlatformIO not installed"}
 
-        # Step 2: Flash
+        # Step 2: Flash the selected board
         await self._broadcast("[FLASH] ══════════════════════════════════════")
-        await self._broadcast(f"[FLASH] Flashing firmware to {port}...")
+        await self._broadcast(f"[FLASH] Flashing {board} firmware to {port}...")
         await self._broadcast("[FLASH] ══════════════════════════════════════")
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                "pio", "run", "-t", "upload",
+                "pio", "run", "-e", env, "-t", "upload",
                 "--upload-port", port,
                 cwd=str(project_root),
                 stdout=asyncio.subprocess.PIPE,
