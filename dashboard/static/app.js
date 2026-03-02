@@ -402,7 +402,10 @@
             data.payloads.forEach(function (p) {
                 var cell = data.matrix[device] && data.matrix[device][p.id];
                 if (cell) {
-                    html += '<td class="cell-' + cell.status + '" title="' + escapeHtml(cell.tested_at) + '">' + cell.status + "</td>";
+                    html += '<td class="cell-' + cell.status + '" title="' + escapeHtml(cell.tested_at) + '">' +
+                        '<span class="cell-text">' + cell.status + '</span>' +
+                        '<button class="cell-del" data-result-id="' + cell.id + '" title="Delete result">x</button>' +
+                        "</td>";
                 } else {
                     html += '<td class="cell-untested">-</td>';
                 }
@@ -411,6 +414,26 @@
         });
         html += "</tbody></table>";
         container.innerHTML = html;
+
+        // Delete result handlers
+        container.querySelectorAll(".cell-del").forEach(function (btn) {
+            btn.addEventListener("click", async function (e) {
+                e.stopPropagation();
+                if (!confirm("Delete this result?")) return;
+                btn.disabled = true;
+                try {
+                    var res = await fetch("/api/results/" + btn.dataset.resultId, { method: "DELETE" });
+                    if (res.ok) {
+                        showToast("Result deleted", "success");
+                        loadMatrix();
+                    } else {
+                        showToast("Delete failed", "error");
+                    }
+                } catch (err) {
+                    showToast("Delete error: " + err.message, "error");
+                }
+            });
+        });
     }
 
     // ====================================================================
