@@ -257,6 +257,31 @@ td code {
 .cell-unknown { background: rgba(136, 136, 136, 0.1); color: var(--text-secondary); }
 .cell-untested { color: #333; }
 
+/* Matrix cell with delete button */
+.matrix-table td { position: relative; }
+.cell-text { display: inline; }
+.cell-del {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 16px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.matrix-table td:hover .cell-del { opacity: 1; }
+.cell-del:hover { background: var(--accent-red); color: #fff; }
+
 #matrix-container { overflow-x: auto; }
 
 /* Serial monitor — split layout */
