@@ -184,11 +184,24 @@ def create_result(result: ResultCreate):
     return dict(row)
 
 
+@app.delete("/api/results/{result_id}")
+def delete_result(result_id: int):
+    conn = get_db()
+    existing = conn.execute("SELECT * FROM results WHERE id = ?", (result_id,)).fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(404, "Result not found")
+    conn.execute("DELETE FROM results WHERE id = ?", (result_id,))
+    conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
 @app.get("/api/results/matrix")
 def get_results_matrix():
     conn = get_db()
     rows = conn.execute(
-        """SELECT r.device_name, r.payload_id, p.text as payload_text,
+        """SELECT r.id, r.device_name, r.payload_id, p.text as payload_text,
                   p.category, r.status, r.tested_at
            FROM results r JOIN payloads p ON r.payload_id = p.id
            ORDER BY r.tested_at DESC"""
@@ -207,6 +220,7 @@ def get_results_matrix():
     matrix: dict = {}
     for r in rows:
         matrix.setdefault(r["device_name"], {})[r["payload_id"]] = {
+            "id": r["id"],
             "status": r["status"],
             "tested_at": r["tested_at"],
         }
