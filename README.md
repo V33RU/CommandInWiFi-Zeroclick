@@ -79,8 +79,8 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
                      (HTTP)   |     | (ws://serial)
                               v     v
                     +---------------------------+
-                    |     FastAPI Backend        |
-                    |     (dashboard/app.py)     |
+                    |     FastAPI Backend       |
+                    |     (dashboard/app.py)    |
                     |                           |
                     |  +----------+ +--------+  |
                     |  | SQLite   | | Serial |  |
@@ -178,7 +178,8 @@ Dashboard                     ESP Firmware                  Serial Manager
     |                             |                             |
     |                             |              +--- [VULN:HIGH] alert --->|
     |                             |              |     via WebSocket        |
-    |<--- ws://serial ------------|<-------------+                         |
+    |<--- ws://serial ------------|<-------------+                          |
+
 ```
 
 ---
@@ -196,7 +197,7 @@ Dashboard                     ESP Firmware                  Serial Manager
                 v                                 v
     +-------------------+             +-------------------+
     | SCAN-TIME DETECT  |             | CONNECT-TIME      |
-    | (ESP32 only)      |             | DETECT             |
+    | (ESP32 only)      |             | DETECT            |
     +-------------------+             +-------------------+
     |                   |             |                   |
     | Promiscuous mode  |             | WiFi AP events:   |
@@ -212,39 +213,40 @@ Dashboard                     ESP Firmware                  Serial Manager
     |    +----+----+    |             |    +----+----+    |
     |    | YES     |    |             |    | YES     |    |
     |    v         |    |             |    v         |    |
-    | PROBE_LOST   |    |             | Crash or    |    |
-    | = scan crash |    |             | Reboot?     |    |
-    +------+-------+    |             +------+------+    |
-           |            |                    |           |
-           +------------+--------------------+           |
-                        |                                |
-                        v                                |
-              +-------------------+                      |
-              | CONFIDENCE ENGINE |                      |
-              | (Multi-Signal)    |                      |
-              +-------------------+                      |
-              |                   |                      |
-              | Signals combined: |                      |
-              |                   |                      |
-              | probe_lost ------+                      |
-              | quick_disconnect-+                      |
-              | reconnect ------+                       |
-              |                 |                       |
-              |    +------------+----------+            |
-              |    |            |          |            |
-              |    v            v          v            |
-              | CRITICAL     HIGH      MEDIUM          |
-              | (3 signals)  (2 sig)   (1 sig)         |
-              |                                        |
-              | Result -> Dashboard Vuln Panel          |
-              | Result -> Auto-save to DB (optional)    |
-              +----------------------------------------+
+    | PROBE_LOST   |    |             | Crash or     |    |
+    | = scan crash |    |             | Reboot?      |    |
+    +------+-------+    |             +------+------+     |
+           |            |                    |            |
+           +------------+--------------------+            |
+                        |                                 |
+                        v                                 |
+              +-------------------+                       |
+              | CONFIDENCE ENGINE |                       |
+              | (Multi-Signal)    |                       |
+              +-------------------+                       |
+              |                   |                       |
+              | Signals combined: |                       |
+              |                   |                       |
+              | probe_lost ------+                        |
+              | quick_disconnect-+                        |
+              | reconnect ------+                         |
+              |                 |                         |
+              |    +------------+----------+              |
+              |    |            |          |              |
+              |    v            v          v              |
+              | CRITICAL     HIGH      MEDIUM             |
+              | (3 signals)  (2 sig)   (1 sig)            |
+              |                                           |
+              | Result -> Dashboard Vuln Panel            |
+              | Result -> Auto-save to DB (optional)      |
+              +-------------------------------------------+
 
 Confidence Scoring:
   CRITICAL = probe_lost + quick_disconnect + reconnect (all three)
   HIGH     = probe_lost alone, OR two combined signals
   MEDIUM   = quick_disconnect alone, OR reconnect alone
   LOW      = unclassified / insufficient data
+
 ```
 
 ---
