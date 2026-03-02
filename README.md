@@ -96,14 +96,13 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
                     |   (CommandInWiFi.ino)     |
                     |                           |
                     |   WiFi AP Mode            |
-                    |   Promiscuous Mode (ESP32)|
                     |   CIW Protocol Handler    |
                     +---------------------------+
-                          |             |
-            Beacon Frames |             | Probe Monitoring
-            (Malicious    |             | (ESP32 only)
-             SSIDs)       |             |
-                          v             v
+                                |
+                  Beacon Frames |
+                  (Malicious    |
+                   SSIDs)       |
+                                v
                     +---------------------------+
                     |    Target IoT Devices     |
                     |                           |
@@ -157,8 +156,8 @@ Dashboard                     ESP Firmware                  Serial Manager
     |                             |                             |
     |                             | 7. Target connects to AP    |
     |                             |                             |
-    |                             | CIW:STA_CONNECT:<mac>:<ssid>|
-    |<--- serial read ------------|--- log connect event ------>|
+    |                             | CIW:STA_CONNECT:<mac>|<ssid>|
+    |<--- serial read ------------|--- log connect time ------->|
     |                             |                             |
     |                             | 8. Target disconnects       |
     |                             |                             |
@@ -167,18 +166,9 @@ Dashboard                     ESP Firmware                  Serial Manager
     |                             |                      duration < 10s?
     |                             |                      = possible crash
     |                             |                             |
-    |                             | 9. Probe monitoring (ESP32) |
-    |                             |                             |
-    |                             | CIW:PROBE_NEW:<mac>         |
-    |<--- serial read ------------|--- track probing device --->|
-    |                             |                             |
-    |                             | CIW:PROBE_LOST:<mac>:<ssid> |
-    |<--- serial read ------------|--- scan-crash detected! --->|
-    |                             |                      compute confidence
-    |                             |                             |
-    |                             |              +--- [VULN:HIGH] alert --->|
-    |                             |              |     via WebSocket        |
-    |<--- ws://serial ------------|<-------------+                          |
+    |                             |              CRASH alert -->|
+    |                             |              via WebSocket   |
+    |<--- ws://serial ------------|<----------------------------|
 
 ```
 
@@ -192,61 +182,58 @@ Dashboard                     ESP Firmware                  Serial Manager
                         | Malicious SSID   |
                         +--------+---------+
                                  |
-                +----------------+----------------+
-                |                                 |
-                v                                 v
-    +-------------------+             +-------------------+
-    | SCAN-TIME DETECT  |             | CONNECT-TIME      |
-    | (ESP32 only)      |             | DETECT            |
-    +-------------------+             +-------------------+
-    |                   |             |                   |
-    | Promiscuous mode  |             | WiFi AP events:   |
-    | monitors 802.11   |             | STA_CONNECT and   |
-    | probe requests    |             | STA_DISCONNECT    |
-    |                   |             |                   |
-    | Device sending    |             | Device connects   |
-    | probes? Track it  |             | to malicious AP   |
-    |                   |             |                   |
-    | Probes stop after |             | Quick disconnect  |
-    | SSID change?      |             | (< 10 seconds)?   |
-    |         |         |             |         |         |
-    |    +----+----+    |             |    +----+----+    |
-    |    | YES     |    |             |    | YES     |    |
-    |    v         |    |             |    v         |    |
-    | PROBE_LOST   |    |             | Crash or     |    |
-    | = scan crash |    |             | Reboot?      |    |
-    +------+-------+    |             +------+------+     |
-           |            |                    |            |
-           +------------+--------------------+            |
-                        |                                 |
-                        v                                 |
-              +-------------------+                       |
-              | CONFIDENCE ENGINE |                       |
-              | (Multi-Signal)    |                       |
-              +-------------------+                       |
-              |                   |                       |
-              | Signals combined: |                       |
-              |                   |                       |
-              | probe_lost ------+                        |
-              | quick_disconnect-+                        |
-              | reconnect ------+                         |
-              |                 |                         |
-              |    +------------+----------+              |
-              |    |            |          |              |
-              |    v            v          v              |
-              | CRITICAL     HIGH      MEDIUM             |
-              | (3 signals)  (2 sig)   (1 sig)            |
-              |                                           |
-              | Result -> Dashboard Vuln Panel            |
-              | Result -> Auto-save to DB (optional)      |
-              +-------------------------------------------+
-
-Confidence Scoring:
-  CRITICAL = probe_lost + quick_disconnect + reconnect (all three)
-  HIGH     = probe_lost alone, OR two combined signals
-  MEDIUM   = quick_disconnect alone, OR reconnect alone
-  LOW      = unclassified / insufficient data
-
+                                 v
+                    +------------------------+
+                    | Target device connects |
+                    | to malicious AP        |
+                    +--------+---------------+
+                             |
+                    CIW:STA_CONNECT:<mac>|<ssid>
+                    Serial Manager logs connect time
+                             |
+                             v
+                    +------------------------+
+                    | Target disconnects     |
+                    +--------+---------------+
+                             |
+                    CIW:STA_DISCONNECT:<mac>|<ssid>
+                             |
+                     +-------+-------+
+                     |               |
+                     v               v
+              +-----------+   +--------------+
+              | duration  |   | duration     |
+              | < 10s     |   | >= 10s       |
+              +-----------+   +--------------+
+                     |               |
+                     v               v
+              +-----------+   +--------------+
+              | SSID just |   | Normal       |
+              | rotated?  |   | disconnect   |
+              | (< 5s)    |   | (no alert)   |
+              +-----+-----+   +--------------+
+                    |
+              +-----+-----+
+              | NO        | YES
+              v           v
+        +-----------+ +--------------+
+        | CRASH     | | Filtered     |
+        | DETECTED  | | (false       |
+        |           | |  positive)   |
+        +-----------+ +--------------+
+              |
+              v
+        +-------------------+
+        | Cooldown check    |
+        | (30s per MAC)     |
+        +--------+----------+
+                 |
+                 v
+        +-------------------+
+        | Alert shown in    |
+        | Vuln Alerts panel |
+        | Save to Results   |
+        +-------------------+
 ```
 
 ---
@@ -259,13 +246,10 @@ Confidence Scoring:
 - **Board Selection** - choose target board (ESP32 or ESP8266) before flashing
 - **Real-Time Serial Monitor** - see CIW protocol messages, deploy progress, ESP output live
 - **Real-Time Device Tracking** - see devices connecting/disconnecting from the malicious AP
-- **Probe Request Monitoring** (ESP32) - detect devices scanning WiFi via promiscuous mode
-- **Automated Vulnerability Detection** - multi-signal confidence scoring engine
-  - Scan-time crash detection (device stops probing after SSID broadcast)
-  - Connect-time crash detection (quick disconnect within threshold)
-  - Reboot detection (disconnect + reconnect pattern)
+- **Automated Vulnerability Detection** - time-based crash detection
+  - Quick disconnect detection (device disconnects within 10 seconds of connecting)
   - False-positive filtering (SSID rotation disconnects excluded)
-- **Confidence Scoring** - critical/high/medium/low based on combined signals
+  - Per-device cooldown (30s) to prevent alert spam from crash-looping devices
 - **Auto-Save Results** - detected vulnerabilities can be saved directly to the results database
 - **Results Matrix** - track which payloads crash/reboot which devices
 - **CIW Protocol** - custom serial protocol for remote payload deployment
@@ -349,8 +333,8 @@ Open **http://localhost:8000** in your browser.
 ### 5. Monitor and Detect Vulnerabilities
 
 - **Serial Monitor** - see live ESP output (SSID changes, device events)
-- **Connected Devices** panel - real-time list of devices on the AP and devices scanning nearby
-- **Vulnerability Alerts** panel - automatic detection with confidence scoring
+- **Connected Devices** panel - real-time list of devices on the malicious AP
+- **Vulnerability Alerts** panel - automatic crash detection (quick disconnect < 10s)
 - **Results Matrix** - record which payloads cause crashes/reboots on target devices
 
 ---
@@ -396,11 +380,9 @@ The dashboard communicates with the ESP via a line-based serial protocol:
 | `CIW:OK:STOP` | Broadcasting stopped |
 | `CIW:STATUS:<state>:<count>:<index>` | Current state, payload count, SSID index |
 | `CIW:SSID:<ssid_text>` | Currently broadcasting this SSID |
-| `CIW:STA_CONNECT:<mac>:<ssid>` | Device connected to AP |
-| `CIW:STA_DISCONNECT:<mac>:<ssid>` | Device disconnected from AP |
-| `CIW:PROBE_NEW:<mac>` | New device detected via probe requests (ESP32) |
-| `CIW:PROBE_LOST:<mac>:<ssid>` | Device stopped probing - possible scan crash (ESP32) |
-| `CIW:DEVICE:<ip>:<mac>` | Periodic device list entry |
+| `CIW:STA_CONNECT:<mac>\|<ssid>` | Device connected to AP |
+| `CIW:STA_DISCONNECT:<mac>\|<ssid>` | Device disconnected from AP |
+| `CIW:DEVICE:<ip>\|<mac>` | Periodic device list entry |
 
 ---
 
@@ -408,41 +390,24 @@ The dashboard communicates with the ESP via a line-based serial protocol:
 
 ### How It Works
 
-CommandInWiFi detects vulnerable devices through two complementary methods:
+CommandInWiFi detects vulnerable devices using **time-based crash detection** (works on both ESP32 and ESP8266):
 
-**1. Scan-Time Crash Detection (ESP32 only)**
+**1. Quick Disconnect Detection**
 
-The ESP32 uses promiscuous mode to monitor 802.11 probe request frames. When a device scans for WiFi networks, it sends probe requests. If a device was actively probing and suddenly stops after the ESP broadcasts a malicious SSID, the device likely crashed during WiFi scan parsing - before even connecting.
-
-```
-Device scanning -> Sees malicious SSID -> Crashes -> No more probes
-                                                     ^^^ PROBE_LOST detected
-```
-
-**2. Connect-Time Crash Detection (ESP32 + ESP8266)**
-
-When a device connects to the malicious AP and disconnects within a short threshold (< 10 seconds), this suggests the device crashed while processing the SSID after connection. If the same MAC reconnects shortly after, this confirms a reboot cycle.
+When a device connects to the malicious AP and disconnects within a short threshold (< 10 seconds), this suggests the device crashed while processing the SSID after connection.
 
 ```
 Device connects -> Processes SSID -> Crashes -> Disconnects (< 10s)
-                                                 ^^^ Quick disconnect detected
-
-Device reconnects after crash -> Reboot confirmed
-                                 ^^^ Reconnect signal detected
+                                                 ^^^ CRASH detected
 ```
 
-**3. False Positive Filtering**
+**2. False Positive Filtering**
 
 When the ESP rotates to a new SSID (via `WiFi.softAP()`), all connected stations are forcibly disconnected. These expected disconnects are filtered out by tracking SSID change timestamps and ignoring disconnects within a 5-second window.
 
-### Confidence Levels
+**3. Per-Device Cooldown**
 
-| Level | Signals | Meaning |
-|-------|---------|---------|
-| **CRITICAL** | 3 signals combined | probe_lost + quick_disconnect + reconnect |
-| **HIGH** | probe_lost alone, or 2 combined signals | Strong evidence of vulnerability |
-| **MEDIUM** | quick_disconnect alone, or reconnect alone | Possible vulnerability, needs confirmation |
-| **LOW** | Insufficient data | Anomaly detected but inconclusive |
+To prevent alert spam from devices stuck in a crash-reboot loop, a 30-second cooldown is applied per MAC address. The same device won't trigger duplicate alerts within this window.
 
 ---
 
@@ -464,7 +429,7 @@ When the ESP rotates to a new SSID (via `WiFi.softAP()`), all connected stations
 | `POST` | `/api/deploy` | Deploy selected payloads to ESP |
 | `POST` | `/api/deploy/stop` | Stop ESP broadcasting |
 | `GET` | `/api/deploy/status` | Get deploy status |
-| `GET` | `/api/devices` | Get connected/probing devices and vuln events |
+| `GET` | `/api/devices` | Get connected devices and vuln events |
 | `POST` | `/api/devices/save-result` | Auto-save detected vulnerability to results DB |
 | `POST` | `/api/firmware/flash` | Compile and flash firmware (with board selection) |
 | `WS` | `/ws/serial` | Real-time serial monitor WebSocket |
@@ -512,8 +477,7 @@ The MicroPython version supports the same CIW protocol and works with the dashbo
 | `pio not found` error | Run `pip install platformio` in your venv |
 | Permission denied on port | `sudo chmod 666 /dev/ttyUSB0` or add user to `dialout` group |
 | Ubuntu can't find NodeMCU | `sudo apt remove brltty` (conflicts with USB serial) |
-| No probe detection | Probe monitoring requires ESP32 (promiscuous mode not available on ESP8266) |
-| False vuln alerts | Expected during SSID rotation. System filters most, but rapid rotation may cause some |
+| False vuln alerts | Expected during SSID rotation. System filters disconnects within 5s of SSID change |
 
 ---
 
