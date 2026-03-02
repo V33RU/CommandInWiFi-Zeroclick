@@ -167,7 +167,7 @@ Dashboard                     ESP Firmware                  Serial Manager
     |                             |                      = possible crash
     |                             |                             |
     |                             |              CRASH alert -->|
-    |                             |              via WebSocket   |
+    |                             |              via WebSocket  |
     |<--- ws://serial ------------|<----------------------------|
 
 ```
