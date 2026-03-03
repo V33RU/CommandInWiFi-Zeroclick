@@ -52,7 +52,7 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
 [![Watch the Demo](https://img.youtube.com/vi/XOZeVIV16Os/maxresdefault.jpg)](https://www.youtube.com/watch?v=XOZeVIV16Os)
 
 <p align="center">
-  <img src="poc/Command In Wi-Fi-1.png" alt="CommandInWiFi PoC" width="600"/>
+  <img src="poc/Command.png" alt="CommandInWiFi PoC" width="600"/>
 </p>
 
 
