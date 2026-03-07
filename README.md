@@ -22,17 +22,13 @@
 ## Research Note
 
 
-> As part of this work, no direct RCE payloads have been added to the framework.
+> The payload library includes RCE-class strings (e.g. `|reboot|`, `$(cmd)`, netcat bind shells) that would achieve command execution **if** the target firmware passes SSIDs to a shell unsanitized. These are standard penetration-testing primitives, not weaponized exploit chains.
 >
-> CommandInWiFi currently focuses on SSID parsing instability, crash detection, reboot detection, and behavioral anomaly analysis , not confirmed remote code execution.
+> CommandInWiFi does **not** include device-specific exploits, confirmed 0-day payloads, or operational attack tooling. Its focus is behavioral detection: crash, reboot, and anomaly analysis through black-box observation.
 >
-> If a validated RCE-class payload were ever introduced and responsibly proven in a controlled environment, that would satisfy the strict definition of zero-click exploitation. Until then, detection does not equal exploitation.
+> Detection does not equal exploitation. Confirming root cause requires separate target-side analysis (device logs, kernel debug, firmware reversing).
 >
-> This project maintains a clear ethical boundary: no weaponized payloads, no operational exploit chains, no service-enabling commands.
->
-> As the project supports custom commands, researchers may add their own logic independently.
->
-> Hints and research direction purpose only .
+> As the project supports custom payloads, researchers may extend it independently for their authorized testing needs.
 >
 > Hunt beyond limits.
 
