@@ -198,6 +198,11 @@ td code {
 .cat-wifi_enc { background: rgba(255, 204, 0, 0.2); color: #ffcc00; }
 .cat-wifi_chain { background: rgba(255, 102, 0, 0.2); color: #ff6600; }
 .cat-wifi_heap { background: rgba(255, 0, 0, 0.2); color: #ff4444; }
+.cat-wifi_xss { background: rgba(255, 85, 255, 0.2); color: #ff55ff; }
+.cat-wifi_path { background: rgba(102, 204, 51, 0.2); color: #66cc33; }
+.cat-wifi_crlf { background: rgba(51, 153, 255, 0.2); color: #3399ff; }
+.cat-wifi_jndi { background: rgba(255, 153, 51, 0.2); color: #ff9933; }
+.cat-wifi_nosql { background: rgba(153, 102, 255, 0.2); color: #9966ff; }
 .cat-custom { background: rgba(136, 136, 136, 0.2); color: var(--text-secondary); }
 
 /* Modal */
