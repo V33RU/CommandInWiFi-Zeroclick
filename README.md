@@ -7,7 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/ESP32-supported-green"/>
   <img src="https://img.shields.io/badge/ESP8266-supported-green"/>
-  <img src="https://img.shields.io/badge/payloads-95-red"/>
+  <img src="https://img.shields.io/badge/payloads-157-red"/>
   <img src="https://img.shields.io/badge/license-MIT-blue"/>
 </p>
 
@@ -51,6 +51,9 @@ CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to test how ne
 - **Execute commands** if SSID text reaches a shell/system call
 - **Leak memory** via format string specifiers in SSID
 - **Corrupt config files** via serialization injection in stored SSIDs
+- **Trigger XSS** when SSID is rendered in web dashboards without sanitization
+- **Exploit Java IoT** via JNDI/Log4Shell lookups in SSID logging paths
+- **Inject HTTP headers** via CRLF sequences in SSID reflected in responses
 
 The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, real-time device tracking, automated vulnerability detection, and recording test results - all from your browser.
 
@@ -245,7 +248,7 @@ Dashboard                     ESP Firmware                  Serial Manager
 
 ## Features
 
-- **95 payloads** across 9 attack categories (pre-loaded)
+- **157 payloads** across 14 attack categories (pre-loaded)
 - **Web Dashboard** - manage payloads, deploy to ESP, monitor serial, record results
 - **One-Click Flash** - compile and flash firmware to ESP32/ESP8266 from the dashboard
 - **Board Selection** - choose target board (ESP32 or ESP8266) before flashing
@@ -277,7 +280,7 @@ CommandInWiFi-Zeroclick/
 ├── dashboard/
 │   ├── __init__.py
 │   ├── app.py                 # FastAPI backend (REST + WebSocket)
-│   ├── database.py            # SQLite schema + 95 default payloads
+│   ├── database.py            # SQLite schema + 157 default payloads
 │   ├── serial_manager.py      # Serial I/O, deploy, flash, vuln detection
 │   ├── requirements.txt       # Python dependencies
 │   ├── templates/
@@ -348,15 +351,20 @@ Open **http://localhost:8000** in your browser.
 
 | Category | Count | Description |
 |----------|-------|-------------|
-| `wifi_cmd` | 20 | Shell command injection via pipe, backtick, semicolon, subshell |
-| `wifi_overflow` | 10 | Buffer overflow / boundary fuzzing (32-byte SSID limit) |
+| `wifi_cmd` | 25 | Shell command injection via pipe, backtick, semicolon, subshell, PowerShell, BusyBox |
+| `wifi_overflow` | 26 | Buffer overflow / boundary fuzzing (32-byte, 64-byte, 128-byte boundaries + off-by-one) |
 | `wifi_fmt` | 15 | Format string attacks (`%s`, `%n`, `%x` for crash/leak/write) |
-| `wifi_probe` | 10 | Malformed SSIDs (null bytes, control chars, Unicode edge cases) |
+| `wifi_probe` | 14 | Malformed SSIDs (null bytes, control chars, Unicode edge cases, WiFi Direct spoof) |
 | `wifi_esc` | 8 | Terminal/log escape injection (ANSI codes in SSID) |
-| `wifi_serial` | 8 | Serialization injection (JSON/XML/SQL/template in SSID) |
+| `wifi_serial` | 13 | Serialization injection (JSON/XML/SQL/template/CSV/DDE/YAML/PHP in SSID) |
 | `wifi_enc` | 8 | Encoding normalization attacks (fullwidth Unicode, URL-encode) |
 | `wifi_chain` | 8 | Multi-SSID chain attacks (split payload across sequential SSIDs) |
 | `wifi_heap` | 8 | Memory corruption primitives (heap metadata, canary patterns) |
+| `wifi_xss` | 8 | XSS / Web UI injection (SSIDs rendered unsanitized in IoT dashboards) |
+| `wifi_path` | 6 | Path traversal (SSID used in filesystem paths by firmware) |
+| `wifi_crlf` | 6 | CRLF / HTTP header injection (SSID reflected in HTTP responses) |
+| `wifi_jndi` | 6 | JNDI / Expression Language (Log4Shell, Spring EL in Java-based IoT) |
+| `wifi_nosql` | 6 | NoSQL / LDAP injection (MongoDB operators, LDAP filter injection) |
 
 ---
 
