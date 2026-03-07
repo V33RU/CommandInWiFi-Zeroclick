@@ -40,14 +40,14 @@
 
 ## Why "Zero-Click"?
 
-Every WiFi-enabled device runs a background daemon (`wpa_supplicant`, `NetworkManager`, or a vendor-specific service) that **continuously scans for nearby networks and parses their SSID strings — without any user interaction**. No tap, no connect, no prompt. The SSID is read from the 802.11 beacon frame and processed automatically.
+Every WiFi-enabled device runs a background daemon (`wpa_supplicant`, `NetworkManager`, or a vendor-specific service) that **continuously scans for nearby networks and parses their SSID strings - without any user interaction**. No tap, no connect, no prompt. The SSID is read from the 802.11 beacon frame and processed automatically.
 
-If the target firmware has a code flaw — passing the SSID string unsanitized to a shell call, `system()`, `popen()`, or a log pipeline — the SSID content **executes as a command**. This is the same attack class behind [WiFiDemon (iOS)](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/), [CVE-2023-45208 (TP-Link)](https://nvd.nist.gov/vuln/detail/CVE-2023-45208), and [Marvell Avastar WiFi RCE](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/).
+If the target firmware has a code flaw - passing the SSID string unsanitized to a shell call, `system()`, `popen()`, or a log pipeline - the SSID content **executes as a command**. This is the same attack class behind [WiFiDemon (iOS)](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/), [CVE-2023-45208 (TP-Link)](https://nvd.nist.gov/vuln/detail/CVE-2023-45208), and [Marvell Avastar WiFi RCE](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/).
 
 ### Vulnerable Code Pattern (Target Side)
 
 ```c
-// Common IoT firmware pattern — SSID reaches shell unsanitized
+// Common IoT firmware pattern - SSID reaches shell unsanitized
 char cmd[128];
 snprintf(cmd, sizeof(cmd), "iwconfig wlan0 essid %s", ssid);
 system(cmd);   // If ssid = "|reboot|" → executes: iwconfig wlan0 essid |reboot|
@@ -65,16 +65,16 @@ os.popen(f"nmcli dev wifi connect '{ssid}'")  # Shell metachar injection
 
 ### Detection Approach
 
-This framework is designed for **black-box testing** — testing devices you don't have root, JTAG, or serial console access to. You can't attach a debugger to a smart doorbell or an off-the-shelf router.
+This framework is designed for **black-box testing** - testing devices you don't have root, JTAG, or serial console access to. You can't attach a debugger to a smart doorbell or an off-the-shelf router.
 
 What you CAN observe externally:
 - **Behavioral signals**: device reboots, disconnects rapidly, or stops responding after exposure to a specific SSID
 - **Timing analysis**: a device that connects and disconnects within seconds likely crashed processing the SSID
-- **Correlation**: if SSID = `|reboot|` and the device reboots — that's not a coincidence, that's confirmed command execution
+- **Correlation**: if SSID = `|reboot|` and the device reboots - that's not a coincidence, that's confirmed command execution
 
 Once a triggering payload is identified, **target-side analysis** (device logs, kernel debug, firmware reverse engineering) is done separately as a second phase to determine root cause.
 
-> **Deep dive:** See [ATTACK_MODEL.md](ATTACK_MODEL.md) for full technical analysis — 30+ real-world CVEs, vulnerable code patterns across every payload category, 802.11 beacon frame internals, and academic references.
+> **Deep dive:** See [ATTACK_MODEL.md](ATTACK_MODEL.md) for full technical analysis - 30+ real-world CVEs, vulnerable code patterns across every payload category, 802.11 beacon frame internals, and academic references.
 
 ---
 
@@ -90,7 +90,7 @@ CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to test how ne
 - **Exploit Java IoT** via JNDI/Log4Shell lookups in SSID logging paths
 - **Inject HTTP headers** via CRLF sequences in SSID reflected in responses
 
-The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, real-time device tracking, automated vulnerability detection, and recording test results — all from your browser.
+The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, real-time device tracking, automated vulnerability detection, and recording test results - all from your browser.
 
 [![Watch the Demo](https://img.youtube.com/vi/XOZeVIV16Os/maxresdefault.jpg)](https://www.youtube.com/watch?v=XOZeVIV16Os)
 
@@ -531,17 +531,17 @@ The MicroPython version supports the same CIW protocol and works with the dashbo
 
 ## References
 
-- **[Attack Model — Full Technical Analysis](ATTACK_MODEL.md)** — 30+ CVEs, vulnerable code patterns, 802.11 internals, academic papers
-- [WiFiDemon iOS 0-day — CVE-2021-30800 (Jamf)](https://www.jamf.com/blog/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/)
-- [D-Link SSID Command Injection — CVE-2023-45208 (RedTeam Pentesting)](https://www.redteam-pentesting.de/en/advisories/rt-sa-2023-006/)
-- [Marvell Avastar WiFi RCE — CVE-2019-6496 (CERT/CC)](https://www.kb.cert.org/vuls/id/730261/)
-- [Broadpwn — CVE-2017-9417 (Exodus Intelligence)](https://blog.exodusintel.com/2017/07/26/broadpwn/)
-- [Windows WiFi RCE — CVE-2024-30078 (CYFIRMA)](https://www.cyfirma.com/research/cve-2024-30078-remote-code-execution-vulnerability-analysis-and-exploitation/)
-- [MediaTek Zero-Click — CVE-2024-20017 (SonicWall)](https://blog.sonicwall.com/en-us/2024/09/critical-exploit-in-mediatek-wi-fi-chipsets-zero-click-vulnerability-cve-2024-20017-threatens-routers-and-smartphones/)
-- [wpa_supplicant P2P SSID Overflow — CVE-2015-1863 (w1.fi)](https://w1.fi/security/2015-1/wpa_supplicant-p2p-ssid-overflow.txt)
-- [FreeBSD WiFi Heap Overflow — CVE-2022-23088 (ZDI)](https://www.thezdi.com/blog/2022/6/15/cve-2022-23088-exploiting-a-heap-overflow-in-the-freebsd-wi-fi-stack)
+- **[Attack Model - Full Technical Analysis](ATTACK_MODEL.md)** - 30+ CVEs, vulnerable code patterns, 802.11 internals, academic papers
+- [WiFiDemon iOS 0-day - CVE-2021-30800 (Jamf)](https://www.jamf.com/blog/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/)
+- [D-Link SSID Command Injection - CVE-2023-45208 (RedTeam Pentesting)](https://www.redteam-pentesting.de/en/advisories/rt-sa-2023-006/)
+- [Marvell Avastar WiFi RCE - CVE-2019-6496 (CERT/CC)](https://www.kb.cert.org/vuls/id/730261/)
+- [Broadpwn - CVE-2017-9417 (Exodus Intelligence)](https://blog.exodusintel.com/2017/07/26/broadpwn/)
+- [Windows WiFi RCE - CVE-2024-30078 (CYFIRMA)](https://www.cyfirma.com/research/cve-2024-30078-remote-code-execution-vulnerability-analysis-and-exploitation/)
+- [MediaTek Zero-Click - CVE-2024-20017 (SonicWall)](https://blog.sonicwall.com/en-us/2024/09/critical-exploit-in-mediatek-wi-fi-chipsets-zero-click-vulnerability-cve-2024-20017-threatens-routers-and-smartphones/)
+- [wpa_supplicant P2P SSID Overflow - CVE-2015-1863 (w1.fi)](https://w1.fi/security/2015-1/wpa_supplicant-p2p-ssid-overflow.txt)
+- [FreeBSD WiFi Heap Overflow - CVE-2022-23088 (ZDI)](https://www.thezdi.com/blog/2022/6/15/cve-2022-23088-exploiting-a-heap-overflow-in-the-freebsd-wi-fi-stack)
 - [Over The Air: Exploiting Broadcom's WiFi Stack (Google Project Zero)](https://projectzero.google/2017/04/over-air-exploiting-broadcoms-wi-fi_4.html)
-- [SSID Confusion — CVE-2023-52424 (Mathy Vanhoef)](https://papers.mathyvanhoef.com/wisec2024.pdf)
+- [SSID Confusion - CVE-2023-52424 (Mathy Vanhoef)](https://papers.mathyvanhoef.com/wisec2024.pdf)
 - [DD-WRT SSID Script Injection (WithSecure)](https://labs.withsecure.com/advisories/dd-wrt-ssid-script-injection-vulnerability)
 - [OS Command Injection (PortSwigger)](https://portswigger.net/web-security/os-command-injection)
 - [Zero-Click WiFi Attacks (Kaspersky)](https://www.kaspersky.com/resource-center/definitions/what-is-zero-click-malware)
