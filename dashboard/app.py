@@ -18,6 +18,7 @@ serial_manager = SerialManager()
 VALID_CATEGORIES = [
     "wifi_cmd", "wifi_overflow", "wifi_fmt", "wifi_probe",
     "wifi_esc", "wifi_serial", "wifi_enc", "wifi_chain", "wifi_heap",
+    "wifi_xss", "wifi_path", "wifi_crlf", "wifi_jndi", "wifi_nosql",
     "custom",
 ]
 VALID_STATUSES = ["crashed", "rebooted", "survived", "unknown"]
