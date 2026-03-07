@@ -42,8 +42,7 @@
 
 Every WiFi-enabled device runs a background daemon (`wpa_supplicant`, `NetworkManager`, or a vendor-specific service) that **continuously scans for nearby networks and parses their SSID strings - without any user interaction**. No tap, no connect, no prompt. The SSID is read from the 802.11 beacon frame and processed automatically.
 
-If the target firmware has a code flaw - passing the SSID string unsanitized to a shell call, `system()`, `popen()`, or a log pipeline - the SSID content **executes as a command**. This is the same attack class behind [WiFiDemon (iOS)](https://blog.zecops.com/research/meet-wifidemon-ios-wifi-rce-0-day-vulnerability-and-a-zero-click-vulnerability-that-was-silently-patched/), [CVE-2023-45208 (TP-Link)](https://nvd.nist.gov/vuln/detail/CVE-2023-45208), and [Marvell Avastar WiFi RCE](https://www.helpnetsecurity.com/2019/01/21/marvell-avastar-wi-fi-vulnerability/).
-
+If the target firmware has a code flaw - passing the SSID string unsanitized to a shell call, `system()`, `popen()`, or a log pipeline - the SSID content **executes as a command**.
 ### Vulnerable Code Pattern (Target Side)
 
 ```c
