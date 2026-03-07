@@ -69,13 +69,13 @@ DEFAULT_PAYLOADS = [
     # --- 32-byte boundary (IEEE 802.11 SSID max) ---
     ('A' * 32,               'wifi_overflow',  '32-byte max SSID fill'),
     ('A' * 31 + '\x00',     'wifi_overflow',  'Null-terminated at boundary'),
-    ('\xff' * 32,            'wifi_overflow',  '0xFF fill (invalid UTF-8)'),
+    ('\x7f' * 32,            'wifi_overflow',  '0x7F DEL fill (32 bytes, single-byte safe)'),
     ('\x00' * 32,            'wifi_overflow',  'All null bytes'),
     ('A' * 16 + '\x00' * 16, 'wifi_overflow', 'Half-null padding'),
     ('A' * 30 + '\r\n',     'wifi_overflow',  'CRLF at boundary'),
     ('\x41' * 32,            'wifi_overflow',  'Hex 0x41 fill (32 bytes)'),
-    ('\xfe\xff' * 16,        'wifi_overflow',  'BOM-like invalid encoding'),
-    ('\x80' * 32,            'wifi_overflow',  'Invalid continuation bytes'),
+    ('\x7e\x7f' * 16,        'wifi_overflow',  'Tilde+DEL alternating (32 bytes)'),
+    ('\x01' * 32,            'wifi_overflow',  'SOH control byte fill (32 bytes)'),
     ('A' * 31 + '\x7f',     'wifi_overflow',  'DEL char at boundary'),
 
     # --- 64-byte boundary (common embedded buffer: char ssid[64]) ---
