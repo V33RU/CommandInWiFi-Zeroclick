@@ -334,7 +334,7 @@ CommandInWiFi-Zeroclick/
 ### 1. Clone and Setup
 
 ```bash
-git clone https://github.com/AsciiHusky/CommandInWiFi-Zeroclick.git
+git clone https://github.com/V33RU/CommandInWiFi-Zeroclick.git
 cd CommandInWiFi-Zeroclick
 
 python3 -m venv .venv
@@ -382,7 +382,7 @@ Open **http://localhost:8000** in your browser.
 | Category | Count | Description |
 |----------|-------|-------------|
 | `wifi_cmd` | 25 | Shell command injection via pipe, backtick, semicolon, subshell, PowerShell, BusyBox |
-| `wifi_overflow` | 26 | Buffer overflow / boundary fuzzing (32-byte, 64-byte, 128-byte boundaries + off-by-one) |
+| `wifi_overflow` | 26 | Buffer overflow / boundary fuzzing (32/64/128-byte boundaries + off-by-one). *Note: `WiFi.softAP()` truncates at 32 bytes; >32-byte payloads require raw frame injection.* |
 | `wifi_fmt` | 15 | Format string attacks (`%s`, `%n`, `%x` for crash/leak/write) |
 | `wifi_probe` | 14 | Malformed SSIDs (null bytes, control chars, Unicode edge cases, WiFi Direct spoof) |
 | `wifi_esc` | 8 | Terminal/log escape injection (ANSI codes in SSID) |
