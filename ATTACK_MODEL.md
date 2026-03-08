@@ -105,9 +105,9 @@ This is the same attack class behind:
 
 ```
 ┌────────────┬────────────┬──────────────────────────┐
-│ Element ID │   Length   │      SSID String          │
-│  (1 byte)  │  (1 byte) │     (0-32 bytes)          │
-│   0x00     │   0-32    │   arbitrary octets         │
+│ Element ID │   Length   │      SSID String         │
+│  (1 byte)  │  (1 byte)  │     (0-32 bytes)         │
+│   0x00     │   0-32     │   arbitrary octets       │
 └────────────┴────────────┴──────────────────────────┘
 ```
 
@@ -436,20 +436,20 @@ CommandInWiFi uses **behavioral black-box detection** - observing target device 
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  DETECTION SIGNALS                   │
+│                  DETECTION SIGNALS                  │
 ├──────────────────┬──────────────────────────────────┤
-│ Signal           │ What it indicates                 │
+│ Signal           │ What it indicates                │
 ├──────────────────┼──────────────────────────────────┤
-│ Quick disconnect │ Device crashes processing SSID    │
-│ (< 10 seconds)  │ after connecting to AP             │
+│ Quick disconnect │ Device crashes processing SSID   │
+│ (< 10 seconds)  │ after connecting to AP            │
 ├──────────────────┼──────────────────────────────────┤
 │ Probe lost       │ Device stopped probing after SSID │
-│ (ESP32 only)     │ change - scan-time crash          │
+│ (ESP32 only)     │ change - scan-time crash         │
 ├──────────────────┼──────────────────────────────────┤
-│ Reconnect after  │ Device rebooted and reconnected   │
-│ disconnect       │ - confirms crash + auto-recovery  │
+│ Reconnect after  │ Device rebooted and reconnected  │
+│ disconnect       │ - confirms crash + auto-recovery │
 ├──────────────────┼──────────────────────────────────┤
-│ Behavioral       │ If SSID = |reboot| and device     │
+│ Behavioral       │ If SSID = |reboot| and device    │
 │ correlation      │ reboots - confirmed cmd execution │
 └──────────────────┴──────────────────────────────────┘
 ```
