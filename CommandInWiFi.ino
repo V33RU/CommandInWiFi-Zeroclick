@@ -18,7 +18,7 @@ const char* defaultSSIDs[] = {"|reboot|", "&reboot&", "`reboot`", "$reboot$"};
 const int defaultCount = sizeof(defaultSSIDs) / sizeof(defaultSSIDs[0]);
 
 // ── Dynamic payload queue (filled via CIW serial protocol) ──────────────
-#define MAX_PAYLOADS 64
+#define MAX_PAYLOADS 256
 String payloadQueue[MAX_PAYLOADS];
 int queueCount = 0;
 bool isRunning = false;
