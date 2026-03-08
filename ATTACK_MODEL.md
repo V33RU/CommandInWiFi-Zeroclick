@@ -125,6 +125,8 @@ This is the same attack class behind:
 
 ### 3.1 Command Injection
 
+**Likelihood: High.** Multiple confirmed CVEs. Common in embedded Linux firmware that wraps WiFi utilities via shell calls.
+
 **How it works:** The SSID string reaches a shell execution function (`system()`, `popen()`, `exec()`) without sanitization. Shell metacharacters in the SSID (`|`, `;`, `` ` ``, `$()`) are interpreted as command operators.
 
 **Vulnerable code pattern:**
@@ -160,6 +162,8 @@ os.popen(f"nmcli dev wifi connect '{ssid}'")
 ---
 
 ### 3.2 Buffer Overflow
+
+**Likelihood: High.** Most common WiFi vulnerability class — responsible for the majority of WiFi chip/driver CVEs.
 
 **How it works:** Firmware allocates a fixed-size buffer for the SSID (commonly 32, 33, 64, or 128 bytes) and copies the SSID into it without checking length. Since the SSID IE length field allows up to 255 bytes, an oversized SSID overflows the buffer.
 
@@ -201,9 +205,13 @@ struct p2p_device {
 
 **Why 64 and 128 byte payloads:** Many embedded C firmwares use `char ssid[64]` or `char buf[128]` for SSID storage. The IEEE 802.11 32-byte limit is at the protocol level, but internal buffers are often power-of-two sized. Testing at these boundaries catches different allocator and compiler alignment bugs.
 
+**Current limitation:** The ESP firmware uses `WiFi.softAP()`, which enforces the 32-byte SSID limit — payloads longer than 32 bytes are truncated by the WiFi driver. To broadcast oversized SSIDs, raw beacon frame injection via `esp_wifi_80211_tx()` is required (crafting the 802.11 frame with a Length field > 32 in the SSID IE). The >32-byte payloads are included in the database for future raw-frame firmware support and for reference when testing via other injection methods.
+
 ---
 
 ### 3.3 Format String
+
+**Likelihood: Medium-High.** Proven by WiFiDemon (iOS CVE-2021-30800). Less common than buffer overflows but devastating when present.
 
 **How it works:** The SSID is passed directly as the format string argument to `printf()`, `syslog()`, `NSLog()`, or similar functions. Format specifiers in the SSID (`%s`, `%x`, `%n`) are interpreted, causing memory reads, writes, or crashes.
 
@@ -232,6 +240,8 @@ printf("%s", ssid);
 ---
 
 ### 3.4 XSS / Web UI Injection
+
+**Likelihood: Medium-High.** Multiple confirmed CVEs across router vendors. Any IoT device with a web-based "Site Survey" page is a potential target.
 
 **How it works:** IoT devices with web administration interfaces display nearby WiFi networks in a "Site Survey" or "Wireless Networks" page. If the SSID is rendered in HTML without escaping, JavaScript in the SSID executes in the admin's browser session.
 
@@ -318,6 +328,8 @@ response.headers["X-Current-Network"] = ssid
 
 ### 3.7 JNDI / Expression Language
 
+**Likelihood: Low-Medium.** Applies primarily to enterprise-grade APs and Java-based IoT gateways. Consumer IoT devices rarely run Java. Included because Log4Shell demonstrated that *any* logged string can be an attack vector, and enterprise WiFi management platforms (Cisco, Aruba, Ruckus) do log SSIDs.
+
 **How it works:** Java-based IoT platforms (Android Things, SmartThings hubs, enterprise APs) that log SSIDs using Log4j or similar frameworks may evaluate expression language in the SSID string. The Log4Shell vulnerability (CVE-2021-44228) demonstrated that `${jndi:ldap://...}` in a logged string triggers remote class loading.
 
 **Attack scenario:**
@@ -341,6 +353,8 @@ Attacker serves malicious Java class → RCE on target
 
 ### 3.8 Path Traversal
 
+**Likelihood: Low.** Requires firmware that uses the SSID directly as a filename or path component — uncommon but not impossible in custom IoT firmware that logs WiFi scan results to per-network files.
+
 **How it works:** Firmware that stores SSID scan history or logs on the filesystem may use the SSID as part of a file path. Directory traversal sequences (`../`) in the SSID can escape the intended directory.
 
 **Vulnerable code pattern:**
@@ -359,6 +373,8 @@ with open(log_path, 'w') as f:
 ---
 
 ### 3.9 NoSQL / LDAP Injection
+
+**Likelihood: Low.** Primarily targets enterprise network appliances and cloud-connected IoT gateways that store WiFi metadata in NoSQL databases or authenticate via LDAP. Rare in consumer devices but present in enterprise WiFi management systems.
 
 **How it works:** IoT devices using MongoDB or LDAP for network management may query using SSID values. MongoDB operator injection (`$gt`, `$ne`, `$regex`) or LDAP filter injection can bypass authentication or leak data.
 
