@@ -163,7 +163,7 @@ os.popen(f"nmcli dev wifi connect '{ssid}'")
 
 ### 3.2 Buffer Overflow
 
-**Likelihood: High.** Most common WiFi vulnerability class — responsible for the majority of WiFi chip/driver CVEs.
+**Likelihood: High.** Most common WiFi vulnerability class - responsible for the majority of WiFi chip/driver CVEs.
 
 **How it works:** Firmware allocates a fixed-size buffer for the SSID (commonly 32, 33, 64, or 128 bytes) and copies the SSID into it without checking length. Since the SSID IE length field allows up to 255 bytes, an oversized SSID overflows the buffer.
 
@@ -205,7 +205,7 @@ struct p2p_device {
 
 **Why 64 and 128 byte payloads:** Many embedded C firmwares use `char ssid[64]` or `char buf[128]` for SSID storage. The IEEE 802.11 32-byte limit is at the protocol level, but internal buffers are often power-of-two sized. Testing at these boundaries catches different allocator and compiler alignment bugs.
 
-**Current limitation:** The ESP firmware uses `WiFi.softAP()`, which enforces the 32-byte SSID limit — payloads longer than 32 bytes are truncated by the WiFi driver. To broadcast oversized SSIDs, raw beacon frame injection via `esp_wifi_80211_tx()` is required (crafting the 802.11 frame with a Length field > 32 in the SSID IE). The >32-byte payloads are included in the database for future raw-frame firmware support and for reference when testing via other injection methods.
+**Current limitation:** The ESP firmware uses `WiFi.softAP()`, which enforces the 32-byte SSID limit - payloads longer than 32 bytes are truncated by the WiFi driver. To broadcast oversized SSIDs, raw beacon frame injection via `esp_wifi_80211_tx()` is required (crafting the 802.11 frame with a Length field > 32 in the SSID IE). The >32-byte payloads are included in the database for future raw-frame firmware support and for reference when testing via other injection methods.
 
 ---
 
@@ -353,7 +353,7 @@ Attacker serves malicious Java class → RCE on target
 
 ### 3.8 Path Traversal
 
-**Likelihood: Low.** Requires firmware that uses the SSID directly as a filename or path component — uncommon but not impossible in custom IoT firmware that logs WiFi scan results to per-network files.
+**Likelihood: Low.** Requires firmware that uses the SSID directly as a filename or path component - uncommon but not impossible in custom IoT firmware that logs WiFi scan results to per-network files.
 
 **How it works:** Firmware that stores SSID scan history or logs on the filesystem may use the SSID as part of a file path. Directory traversal sequences (`../`) in the SSID can escape the intended directory.
 
