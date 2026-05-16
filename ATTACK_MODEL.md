@@ -75,11 +75,7 @@ Every WiFi-enabled device runs a background service that **continuously scans fo
 3. The SSID string is extracted and processed before any user sees it
 4. If the processing code has a flaw, exploitation happens during parsing
 
-This is the same attack class behind:
-- **WiFiDemon (iOS)** - format string in `wifid` during auto-join scan
-- **Marvell Avastar** - heap overflow during 5-minute periodic scan
-- **Broadpwn (Broadcom)** - heap overflow during passive beacon processing
-- **CVE-2024-30078 (Windows)** - stack overflow in WiFi driver management frame parsing
+This same attack class (untrusted attacker-controlled input reaching a parser during background WiFi processing) has produced the genuinely SSID-driven cases this document focuses on, and a wider set of WiFi-stack RCE bugs that are adjacent but not strictly SSID-parsing. The clearest SSID-driven case is **WiFiDemon (iOS)** (CVE-2021-30800), a format string in `wifid` triggered during passive scanning. Other widely-cited WiFi RCEs (Broadpwn / CVE-2017-9417, Marvell Avastar / CVE-2019-6496, MediaTek wappd / CVE-2024-20017, Windows nwifi.sys / CVE-2024-30078, Realtek RTL8195A / CVE-2020-9395) share the same "remote untrusted parser" pattern but trigger on other IEs, EAPOL, IAPP, or LLC packets, not on SSID. See Section 6 for the breakdown.
 
 ---
 
@@ -123,7 +119,7 @@ This is the same attack class behind:
 └────────────┴────────────┴──────────────────────────┘
 ```
 
-**Critical implementation detail:** The Length field is 8 bits, allowing values 0-255. The IEEE 802.11 standard limits SSIDs to 32 bytes, but **many implementations trust the raw length field** without validating against the 32-byte maximum. This single design gap is responsible for numerous buffer overflow CVEs (CVE-2015-1863, CVE-2022-23088, CVE-2017-9417).
+**Critical implementation detail:** The Length field is 8 bits, allowing values 0-255. The IEEE 802.11 standard limits SSIDs to 32 bytes, but **many implementations trust the raw length field** without validating against the 32-byte maximum. The clearest example is CVE-2015-1863 (wpa_supplicant P2P SSID IE, 32-byte buffer, up to 223-byte overflow per the w1.fi advisory). The same 8-bit-length design gap applies to other tagged IEs and has produced overflows in adjacent elements: CVE-2022-23088 (FreeBSD net80211 Mesh ID IE per ZDI), and CVE-2017-9417 / Broadpwn (Broadcom BCM43xx WME IE during association per Exodus, not the SSID IE).
 
 **The SSID is NOT:**
 - Null-terminated (it's a length-prefixed byte array)
@@ -205,17 +201,23 @@ struct p2p_device {
 // overflow of 223 bytes corrupts adjacent heap metadata
 ```
 
-**Real-world CVEs:**
+**Real-world CVEs (genuinely SSID-IE driven):**
 
 | CVE | Component | Buffer | Overflow | Impact |
 |-----|-----------|--------|----------|--------|
-| CVE-2015-1863 | wpa_supplicant P2P | 32 bytes | 223 bytes | Heap corruption, code execution |
-| CVE-2022-23088 | FreeBSD kernel 802.11 | Heap | Arbitrary | Kernel backdoor via Mesh ID IE |
-| CVE-2017-9417 | Broadcom BCM43xx | 44 bytes | 211 bytes | WiFi chip firmware takeover |
-| CVE-2024-30078 | Windows WiFi driver | Stack | Arbitrary | Remote code execution, CVSS 8.8 |
-| CVE-2024-20017 | MediaTek wappd | Heap | Arbitrary | Zero-click RCE, CVSS 9.8 |
-| CVE-2020-9395 | Realtek RTL8195A | Stack | Arbitrary | WiFi module takeover without password |
-| CVE-2025-3328 | Tenda AC1206 | Stack | Arbitrary | System compromise via SSID parameter |
+| CVE-2015-1863 | wpa_supplicant P2P, SSID IE | 32 bytes | up to 223 bytes | Heap corruption via crafted P2P SSID IE (verified, w1.fi advisory) |
+
+**Closely related (not SSID IE specifically, included for context):**
+
+| CVE | Component | Note |
+|-----|-----------|------|
+| CVE-2022-23088 | FreeBSD net80211, Mesh ID IE | Same 8-bit-length design gap, different IE. `se_meshid` buffer in `ieee80211_scan_entry`, triggered by beacon (verified, ZDI). |
+| CVE-2017-9417 (Broadpwn) | Broadcom BCM43xx, WME IE | 44-byte `current_wmm_ie` buffer, up to 211-byte overflow, triggered during association (verified, Exodus). Not SSID. |
+| CVE-2024-20017 | MediaTek wappd, IAPP daemon | OOB write in `IAPP_RcvHandlerSSB` triggered by `RT_IAPP_SEND_SECURITY_BLOCK` protocol message (verified, SonicWall). Not SSID, not beacon-driven. |
+| CVE-2024-30078 | Windows nwifi.sys | `Dot11Translate80211ToEthernetNdisPacket` LLC/VLAN length mishandling (per Cyfirma analysis). Data-plane bug, not SSID-driven. |
+| CVE-2020-9395 | Realtek RTL8195A | Stack overflow in WPA2 4-way handshake `EAPOL-Key` keydata (verified, NVD). Not SSID. |
+| CVE-2019-6496 | Marvell Avastar | Block pool overflow "during identification of available Wi-Fi networks" per NVD; specific IE not documented in primary advisory. |
+| CVE-2025-3328 | Tenda AC1206 web admin | Buffer overflow in `/goform/fast_setting_wifi_set` via `ssid`/`timeZone` HTTP parameters (verified, NVD). Authenticated, web-API trigger, not beacon-deliverable. |
 
 **CommandInWiFi payloads:** `wifi_overflow` category (10 payloads, all ≤32 bytes), 32-byte boundary fills, null-terminated boundary, DEL fill, control-byte fill, CRLF at boundary, off-by-one (`A * 31 + 0x7f`).
 
@@ -247,7 +249,7 @@ printf("%s", ssid);
 
 | CVE | Device | Details |
 |-----|--------|---------|
-| CVE-2021-30800 | iOS (wifid daemon) | SSID `%p%s%s%s%s%n` crashes WiFi. The `%@` specifier (Objective-C) triggers use-after-free enabling **zero-click RCE**. Silently patched in iOS 14.4 (RCE), iOS 14.7 (DoS). |
+| CVE-2021-30800 | iOS (wifid daemon) | Format specifiers in scanned SSID trigger the bug during passive scanning. The publicly demonstrated DoS used `%p%x%@` style payloads; the `%@` Objective-C specifier was the path to the deeper UAF-enabled zero-click RCE that Jamf later disclosed. Apple silently patched the 0-click RCE in iOS 14.4 (per Jamf, no CVE assigned by Apple for that path; CVE-2021-30800 was later assigned). |
 
 **Why this is critical:** The iOS WiFiDemon vulnerability proves that a **32-byte SSID is enough for full remote code execution** via format string. The `%@` Objective-C format specifier is only 2 bytes, leaving 30 bytes for payload construction.
 
@@ -273,14 +275,14 @@ printf("%s", ssid);
 </table>
 ```
 
-**Real-world CVEs:**
+**Real-world advisories (no SSID-XSS CVE-numbered cases confirmed):**
 
-| CVE/Advisory | Device | Details |
+| Advisory | Device | Details |
 |-----|--------|---------|
-| (no CVE assigned) | DD-WRT | Site Survey page renders beacon SSIDs without escaping. Admin session hijack. |
-| (no CVE assigned) | BT Home Hub | SSIDs at `/cgi/b/_wds_/cfg/` rendered unsanitized. JavaScript with admin privileges. |
-| CVE-2022-30329 | Trendnet TEW-831DR | Nearby network SSIDs displayed without sanitization. |
-| CVE-2025-25427 | TP-Link WR841N | XSS via SSID in router web interface. |
+| WithSecure Labs | DD-WRT | Site Survey page renders beacon SSIDs without escaping. Admin session hijack possible. |
+| WithSecure Labs | BT Home Hub | SSIDs at `/cgi/b/_wds_/cfg/` rendered unsanitized. JavaScript with admin privileges. |
+
+No CVE-numbered XSS-via-SSID case is known to the authors. Two CVEs initially included here in earlier drafts (CVE-2022-30329 Trendnet, CVE-2025-25427 TP-Link) were verified at NVD and turned out to be unrelated (OS command injection in admin UI, and stored XSS in a UPnP port mapping field, respectively). Both were removed.
 
 **Attack flow:**
 
@@ -453,12 +455,12 @@ The SSID attack surface exists because multiple layers of software process the S
 | **NetworkManager** | Linux (GNOME) | Network management, D-Bus interface | Inherits wpa_supplicant bugs |
 | **iwd** | Linux (Intel) | Modern supplicant replacement | Newer, smaller attack surface |
 | **wifid** | iOS | WiFi management daemon | CVE-2021-30800 (format string RCE) |
-| **wappd** | MediaTek chipsets | Hotspot 2.0 / IAPP daemon | CVE-2024-20017 (zero-click OOB write) |
-| **Vendor web UIs** | Routers, APs | Admin interface, Site Survey | DD-WRT XSS, BT Home Hub XSS, Trendnet XSS |
-| **Kernel WiFi drivers** | Windows, FreeBSD, Linux | 802.11 frame parsing | CVE-2024-30078, CVE-2022-23088 |
-| **WiFi chip firmware** | Broadcom, Qualcomm, Realtek, Marvell | On-chip beacon processing | CVE-2017-9417, CVE-2019-6496, CVE-2020-9395 |
+| **wappd** | MediaTek chipsets | Hotspot 2.0 / IAPP daemon | CVE-2024-20017 (zero-click OOB write via IAPP protocol, not SSID-driven) |
+| **Vendor web UIs** | Routers, APs | Admin interface, Site Survey | DD-WRT and BT Home Hub SSID-XSS (WithSecure advisories, no CVEs assigned) |
+| **Kernel WiFi drivers** | Windows, FreeBSD, Linux | 802.11 / data-frame parsing | CVE-2022-23088 (FreeBSD Mesh ID IE in beacon), CVE-2024-30078 (Windows LLC/VLAN data-frame, not SSID) |
+| **WiFi chip firmware** | Broadcom, Marvell, Realtek | On-chip frame processing | CVE-2017-9417 (Broadcom WME IE on association, not SSID), CVE-2019-6496 (Marvell, scan-time, specific IE not documented in primary sources), CVE-2020-9395 (Realtek EAPOL handshake, not SSID) |
 
-**Key insight:** The SSID is processed at multiple levels - chip firmware, kernel driver, userspace daemon, web UI. A vulnerability at **any** level creates an attack path. CommandInWiFi payloads are designed to reach all of them.
+**Key insight:** WiFi parsing happens at multiple levels (chip firmware, kernel driver, userspace daemon, web UI). A vulnerability at any of them creates an attack path. The SSID-specific subset of that landscape (what this tool actually probes) is narrower than the broader WiFi-stack CVE history: many famous WiFi RCEs hit adjacent IEs, EAPOL handshakes, or vendor daemon protocols rather than the SSID IE itself. The table above is annotated accordingly.
 
 ---
 
@@ -466,32 +468,16 @@ The SSID attack surface exists because multiple layers of software process the S
 
 CommandInWiFi uses **behavioral black-box detection** - observing target device reactions externally without requiring root access, JTAG, or serial console on the target.
 
-### Phase 1: Behavioral Detection (This Framework)
+### Phase 1: Behavioral Detection (This Tool)
 
-```
-┌─────────────────────────────────────────────────────┐
-│                  DETECTION SIGNALS                  │
-├──────────────────┬──────────────────────────────────┤
-│ Signal           │ What it indicates                │
-├──────────────────┼──────────────────────────────────┤
-│ Quick disconnect │ Device crashes processing SSID   │
-│ (< 10 seconds)  │ after connecting to AP            │
-├──────────────────┼──────────────────────────────────┤
-│ Probe lost       │ Device stopped probing after SSID │
-│ (ESP32 only)     │ change - scan-time crash         │
-├──────────────────┼──────────────────────────────────┤
-│ Reconnect after  │ Device rebooted and reconnected  │
-│ disconnect       │ - confirms crash + auto-recovery │
-├──────────────────┼──────────────────────────────────┤
-│ Behavioral       │ If SSID = |reboot| and device    │
-│ correlation      │ reboots - confirmed cmd execution │
-└──────────────────┴──────────────────────────────────┘
-```
+The framework signals exactly one thing: a **quick disconnect** (target associates and disconnects in under 10 seconds), confirmed by the **same SSID producing at least two such disconnects** before any alert is raised. The per-SSID counter is reset on every SSID rotation and on every deployment clear, so each broadcast SSID gets a fresh detection window.
+
+That is the entire signal. The tool does not implement probe-loss tracking, reconnection correlation, or semantic correlation between SSID content and observed target behavior. Those would be useful but require either ESP32 promiscuous-mode probe capture or target-side semantic knowledge, neither of which is currently built. They are listed in [Future Work](#future-work).
 
 **Why behavioral, not debugger-based:**
 - You typically don't have shell/JTAG access to the target IoT device
 - You can't attach GDB to a smart doorbell, router, or camera
-- The device under test is a black box - behavior is the only observable
+- The device under test is a black box, behavior is the only observable
 - This mirrors real-world attack scenarios where the attacker has no device access
 
 ### Phase 2: Root Cause Analysis (Separate)
@@ -512,32 +498,34 @@ Once a triggering SSID is identified via behavioral detection, root cause analys
 
 ## 6. Real-World CVE Reference Table
 
-### SSID-Specific Vulnerabilities
+### Genuinely SSID-Driven Vulnerabilities
 
-| CVE | Year | Device | Class | CVSS | Zero-Click | Delivery via this tool |
-|-----|------|--------|-------|------|------------|------------------------|
-| CVE-2021-30800 | 2021 | iOS (wifid) | Format String + UAF | High | Yes (auto-join scan) | **D**, scan-time format string, in scope |
-| CVE-2023-45208 | 2023 | D-Link DAP-X1860 | Command Injection | High | During network setup | **A**, needs association, in scope |
-| CVE-2017-2915 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan | **D**, `parse_ap_list` runs at scan time, no association required, in scope |
-| CVE-2017-12094 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan | **D**, scan-time `sed` invocation on SSID, in scope |
-| CVE-2023-42810 | 2023 | Node.js systeminformation | Command Injection | 9.8 | When app scans WiFi | **D**, fires when host app calls `wifiConnections()` on scan results, in scope |
-| CVE-2015-1863 | 2015 | wpa_supplicant | Heap Overflow (P2P) | High | During P2P scan | **R**, 255-byte SSID IE, requires raw frames |
-| CVE-2022-30329 | 2022 | Trendnet TEW-831DR | XSS via SSID | Medium | Admin views scan | **S**, needs admin to open web UI |
-| CVE-2025-25427 | 2025 | TP-Link WR841N | XSS via SSID | Medium | Admin views scan | **S**, needs admin to open web UI |
-| CVE-2025-3328 | 2025 | Tenda AC1206 | Buffer Overflow | High | During WiFi setup | **A** if ≤32-byte SSID triggers; **R** otherwise |
+These are the CVEs where the SSID string is the attacker-controlled input that reaches a vulnerable parser. Verified against NVD and primary advisories.
 
-### WiFi Chip/Driver Firmware (Zero-Click)
+| CVE | Year | Device | Class | CVSS | Trigger | Delivery via this tool |
+|-----|------|--------|-------|------|---------|------------------------|
+| CVE-2021-30800 | 2021 | iOS (wifid) | Format String + UAF | High | Passive scan (per Jamf) | **D**, scan-time format string, in scope |
+| CVE-2023-45208 | 2023 | D-Link DAP-X1860 | Command Injection (`'` in SSID) | High | Setup or scan on configured device (per RedTeam Pentesting) | **D**, scan-time on configured device, in scope |
+| CVE-2017-2915 | 2017 | Circle with Disney | Command Injection (SSID to shell) | High | During WiFi scan | **D**, in scope |
+| CVE-2017-12094 | 2017 | Circle with Disney | Command Injection (SSID to `sed`) | Medium | During WiFi scan | **D**, in scope |
+| CVE-2023-42810 | 2023 | Node.js `systeminformation` | Command Injection (`wifiConnections`/`wifiNetworks`) | 9.8 | When host app calls scan API | **D**, in scope |
+| CVE-2015-1863 | 2015 | wpa_supplicant P2P | Heap Overflow via SSID IE | Medium | P2P scan | **R**, requires 255-byte SSID IE, raw frames |
+| CVE-2025-3328 | 2025 | Tenda AC1206 | Buffer Overflow in `/goform/fast_setting_wifi_set` SSID parameter | High | Authenticated HTTP POST to admin endpoint | **Not deliverable by this tool**, web-API trigger, not beacon. Listed because the SSID parameter is the input. |
 
-> **All rows in this table are out of scope for the current tool.** They require crafted 802.11 frames with attacker-controlled IE length / fragmentation / aggregation bytes that `WiFi.softAP()` will not produce. They are listed here as the reference attack landscape, not as targets this framework drives. See [Future Work](#future-work).
+CVE-2022-30329 (Trendnet TEW-831DR) and CVE-2025-25427 (TP-Link WR841N) appeared in earlier drafts of this document as XSS-via-SSID; both were verified against NVD and turned out to be unrelated (OS command injection in admin UI, and stored XSS in a UPnP port mapping field, respectively). They are not listed above.
 
-| CVE | Year | Chip/Driver | Class | CVSS | Affected Devices | Delivery via this tool |
-|-----|------|-------------|-------|------|------------------|------------------------|
-| CVE-2017-9417 | 2017 | Broadcom BCM43xx | Heap Overflow | Critical | Millions of Android/iOS devices | **R** |
-| CVE-2019-6496 | 2019 | Marvell Avastar | Block Pool Overflow | High | PS4, Xbox, Surface, Galaxy J1 | **R** |
-| CVE-2020-9395 | 2020 | Realtek RTL8195A | Stack Overflow | Critical | IoT WiFi modules | **R** |
-| CVE-2024-20017 | 2024 | MediaTek MT7622/7915 | OOB Write | 9.8 | Ubiquiti, Xiaomi, Netgear | **R** |
-| CVE-2024-30078 | 2024 | Windows WiFi drivers | Stack Overflow | 8.8 | All Windows 10/11/Server | **R** |
-| CVE-2022-23088 | 2022 | FreeBSD kernel 802.11 | Heap Overflow | Critical | pfSense, OPNsense | **R** |
+### Related WiFi-Stack Vulnerabilities (Not SSID-Driven)
+
+> **All rows in this table are out of scope for the current tool.** Each was originally cited in earlier drafts as an SSID-related CVE; verification against primary sources showed the trigger is in a different parser (WME IE, Mesh ID IE, EAPOL handshake, IAPP daemon, LLC/VLAN data frame, etc.). They are kept here as the broader WiFi-stack attack landscape and to be transparent about what is *not* a precedent for the kind of SSID-injection bug this tool probes.
+
+| CVE | Year | Component | Actual Trigger | Primary Source |
+|-----|------|-----------|----------------|----------------|
+| CVE-2017-9417 (Broadpwn) | 2017 | Broadcom BCM43xx | WME IE during association, 44-byte buffer, up to 211-byte overflow | Exodus Intelligence writeup |
+| CVE-2019-6496 | 2019 | Marvell Avastar | "Malformed Wi-Fi packets during identification of available Wi-Fi networks". Specific IE not in primary advisory. | NVD |
+| CVE-2020-9395 | 2020 | Realtek RTL8195A | Stack overflow in WPA2 4-way handshake, malformed EAPOL-Key keydata. Not SSID. | NVD |
+| CVE-2024-20017 | 2024 | MediaTek wappd | OOB write in `IAPP_RcvHandlerSSB` via `RT_IAPP_SEND_SECURITY_BLOCK` protocol message. Not SSID, not beacon. | SonicWall writeup |
+| CVE-2024-30078 | 2024 | Windows nwifi.sys | LLC/VLAN packet length mishandling in `Dot11Translate80211ToEthernetNdisPacket`. Data frame, not management frame, not SSID. | Cyfirma analysis |
+| CVE-2022-23088 | 2022 | FreeBSD net80211 | Heap overflow via Mesh ID IE in beacon (`se_meshid` buffer, ~188-byte overflow target). Adjacent IE class but not SSID. | ZDI writeup |
 
 ### Protocol-Level
 
@@ -590,4 +578,4 @@ A secondary improvement direction is the vulnerability detector: probe-after-dis
 
 ---
 
-*This document is part of the [CommandInWiFi](https://github.com/V33RU/CommandInWiFi-Zeroclick) project - a zero-click SSID command injection testing framework for IoT security research.*
+*This document is part of the [CommandInWiFi](https://github.com/V33RU/CommandInWiFi-Zeroclick) project, an SSID-injection test tool for IoT security research.*
