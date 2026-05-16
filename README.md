@@ -15,6 +15,8 @@ Use it if you want to step through the categories or run a longer session. For a
 
 Read [ATTACK_MODEL.md](ATTACK_MODEL.md) first to see which payload classes actually fire on real targets and which CVEs are verified precedents.
 
+If you have the firmware or binary for the target and want to look for these bugs statically instead of probing them live, see [Sidewinder](https://github.com/V33RU/sidewinder). It scans binaries and firmware for the same class of SSID-handling sinks that this tool probes from the air.
+
 ---
 
 ## Disclaimer
