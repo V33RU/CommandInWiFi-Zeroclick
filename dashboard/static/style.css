@@ -196,8 +196,7 @@ td code {
 .cat-wifi_esc { background: rgba(255, 0, 170, 0.2); color: #ff00aa; }
 .cat-wifi_serial { background: rgba(0, 255, 170, 0.2); color: #00ffaa; }
 .cat-wifi_enc { background: rgba(255, 204, 0, 0.2); color: #ffcc00; }
-.cat-wifi_chain { background: rgba(255, 102, 0, 0.2); color: #ff6600; }
-.cat-wifi_heap { background: rgba(255, 0, 0, 0.2); color: #ff4444; }
+.cat-wifi_fuzz { background: rgba(255, 0, 0, 0.2); color: #ff4444; }
 .cat-wifi_xss { background: rgba(255, 85, 255, 0.2); color: #ff55ff; }
 .cat-wifi_path { background: rgba(102, 204, 51, 0.2); color: #66cc33; }
 .cat-wifi_crlf { background: rgba(51, 153, 255, 0.2); color: #3399ff; }
@@ -289,7 +288,7 @@ td code {
 
 #matrix-container { overflow-x: auto; }
 
-/* Serial monitor — split layout */
+/* Serial monitor, split layout */
 .serial-split {
     display: flex;
     gap: 16px;
@@ -619,7 +618,7 @@ td code {
 .th-check { width: 40px; text-align: center; }
 .td-check { text-align: center; }
 
-/* Custom checkboxes — bigger, easier to click */
+/* Custom checkboxes, bigger, easier to click */
 .payload-check, #select-all {
     appearance: none;
     -webkit-appearance: none;
@@ -665,7 +664,7 @@ td code {
     background: #000;
 }
 
-/* Payload table rows — prevent text selection, clickable */
+/* Payload table rows, prevent text selection, clickable */
 #payloads-body tr {
     cursor: pointer;
     user-select: none;

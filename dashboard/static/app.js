@@ -90,7 +90,7 @@
         }
     }
 
-    // Select All handler — only toggles visible (filtered) checkboxes
+    // Select All handler, only toggles visible (filtered) checkboxes
     document.getElementById("select-all").addEventListener("change", function () {
         var checked = this.checked;
         document.querySelectorAll(".payload-check").forEach(function (cb) {
@@ -112,7 +112,7 @@
     // ====================================================================
     var categoryFilter = document.getElementById("category-filter");
 
-    // Clear selections when switching category — avoids confusing counts
+    // Clear selections when switching category, avoids confusing counts
     categoryFilter.addEventListener("change", function () {
         selectedIds.clear();
         document.getElementById("select-all").checked = false;
@@ -190,7 +190,7 @@
             })
             .join("");
 
-        // Row click handler — toggle checkbox when clicking anywhere on the row
+        // Row click handler, toggle checkbox when clicking anywhere on the row
         tbody.querySelectorAll("tr").forEach(function (row) {
             row.addEventListener("click", function (e) {
                 // Don't toggle if user clicked a button (Edit/Del)
@@ -613,18 +613,23 @@
         }
 
         container.innerHTML = vulns.slice().reverse().map(function (v) {
-            var vuln = v.vuln || "crash";
+            var vuln = v.vuln || "quick_disconnect";
             var dur = v.duration ? v.duration.toFixed(1) + "s" : "?";
+            var count = v.quick_disconnect_count || 2;
+            var tooltip = "Device left within " + dur + " of associating with this SSID. " +
+                "Could be a crash or normal behavior (open AP / captive-portal probe failure). " +
+                "Verify before saving.";
 
             return (
-                '<div class="vuln-entry vuln-crash">' +
+                '<div class="vuln-entry vuln-crash" title="' + escapeHtml(tooltip) + '">' +
                 '<div class="vuln-row-top">' +
-                '<span class="vuln-badge">CRASH</span>' +
+                '<span class="vuln-badge">QUICK DISCONNECT</span>' +
+                '<span class="vuln-detail">x' + count + '</span>' +
                 '</div>' +
                 '<div class="vuln-row-bottom">' +
                 '<span class="vuln-mac">' + escapeHtml(v.mac) + '</span> ' +
-                '<span class="vuln-detail">disconnected after ' + dur +
-                ' on <code>' + escapeHtml(truncate(v.ssid || "", 18)) + '</code></span>' +
+                '<span class="vuln-detail">left after ' + dur +
+                ' on <code>' + escapeHtml(truncate(v.ssid || "", 18)) + '</code>, possible crash, verify</span>' +
                 '</div>' +
                 '<button class="vuln-save-btn" data-mac="' + escapeHtml(v.mac) + '" ' +
                 'data-ssid="' + escapeHtml(v.ssid || "") + '" ' +

@@ -10,8 +10,8 @@ import serial.tools.list_ports
 from fastapi import WebSocket
 
 
-CRASH_THRESHOLD = 10  # seconds — disconnect faster than this = likely crash
-VULN_COOLDOWN = 30    # seconds — don't re-report same device within this window
+CRASH_THRESHOLD = 10  # seconds, disconnect faster than this = likely crash
+VULN_COOLDOWN = 30    # seconds, don't re-report same device within this window
 
 
 class SerialManager:
@@ -30,6 +30,10 @@ class SerialManager:
         self.device_events: list[dict] = []  # event log (last 200)
         # Vuln throttle: mac -> last_reported_time
         self._vuln_reported: dict[str, float] = {}
+        # Confirmation counter: ssid -> count of quick disconnects seen
+        # An alert only fires once the same SSID has produced >=2 quick
+        # disconnects, which filters out open-AP/captive-portal noise.
+        self._quick_disconnects_per_ssid: dict[str, int] = {}
 
     def list_ports(self) -> list[dict]:
         return [
@@ -83,6 +87,8 @@ class SerialManager:
         elif line == "CIW:OK:CLEAR":
             self.deploy_status = "idle"
             self.deploy_count = 0
+            # Fresh deploy starts a fresh detection window.
+            self._quick_disconnects_per_ssid.clear()
         elif line.startswith("CIW:STATUS:"):
             parts = line.split(":")
             if len(parts) >= 4:
@@ -92,7 +98,15 @@ class SerialManager:
                 except (IndexError, ValueError):
                     pass
         elif line.startswith("CIW:SSID:"):
-            self.current_ssid = line[9:]
+            new_ssid = line[9:]
+            # The previous SSID is no longer being broadcast; drop its
+            # quick-disconnect counter so each SSID gets a fresh 2-minute
+            # detection window. Without this, stray quick-disconnects
+            # from passing phones would accumulate across rotations and
+            # trip the >=2 threshold spuriously.
+            if self.current_ssid and self.current_ssid != new_ssid:
+                self._quick_disconnects_per_ssid.pop(self.current_ssid, None)
+            self.current_ssid = new_ssid
             self.last_ssid_change = time.time()
         elif line.startswith("CIW:STA_CONNECT:"):
             self._handle_device_connect(line[16:])
@@ -148,13 +162,22 @@ class SerialManager:
             "time": now, "duration": round(duration, 1),
         }
 
-        # Time-based vulnerability detection
+        # Heuristic detection: a quick disconnect (<10s) MAY indicate a
+        # crash, but is also normal behavior for devices that associate to
+        # an open AP, fail captive-portal probe, and leave. We require the
+        # same SSID to produce >=2 quick disconnects before raising an
+        # alert, and we throttle per-MAC so a crash-looping device doesn't
+        # spam the log.
         if duration > 0 and duration < CRASH_THRESHOLD:
-            # Throttle: don't spam alerts for same device
-            last_reported = self._vuln_reported.get(mac, 0)
-            if (now - last_reported) > VULN_COOLDOWN:
-                event["vuln"] = "crash"
-                self._vuln_reported[mac] = now
+            count = self._quick_disconnects_per_ssid.get(connect_ssid, 0) + 1
+            self._quick_disconnects_per_ssid[connect_ssid] = count
+            event["quick_disconnect_count"] = count
+
+            if count >= 2:
+                last_reported = self._vuln_reported.get(mac, 0)
+                if (now - last_reported) > VULN_COOLDOWN:
+                    event["vuln"] = "quick_disconnect"
+                    self._vuln_reported[mac] = now
 
         self._push_event(event)
 

@@ -3,13 +3,25 @@
 </p>
 
 <h1 align="center">CommandInWiFi</h1>
-<p align="center"><strong>Zero-Click SSID Command Injection Framework</strong></p>
+<p align="center"><strong>An SSID-injection test tool for IoT security research</strong></p>
 <p align="center">
   <img src="https://img.shields.io/badge/ESP32-supported-green"/>
   <img src="https://img.shields.io/badge/ESP8266-supported-green"/>
-  <img src="https://img.shields.io/badge/payloads-157-red"/>
+  <img src="https://img.shields.io/badge/payloads-133-red"/>
   <img src="https://img.shields.io/badge/license-MIT-blue"/>
 </p>
+
+---
+
+## Scope
+
+A small research probe, not a pentesting framework. It calls `WiFi.softAP(ssid)` on an ESP32/ESP8266 with 133 crafted SSIDs and watches whether nearby devices crash on association. The mechanic is simple by design, there is no novel attack technique here.
+
+It is useful for IoT researchers, bug hunters working unaudited firmware, educators, and anyone testing their own gear. It is probably not useful as a general pentest tool. Modern named-brand firmware mostly uses library APIs (`nmcli`, NetworkManager D-Bus, libiw) where SSID is passed as a parameter, so the SSID-to-shell class is rare. Real precedents exist (CVE-2023-45208 D-Link, CVE-2017-2915 Circle, CVE-2025-3328 Tenda, CVE-2023-42810 systeminformation, CVE-2021-30800 iOS WiFiDemon), but they cluster in specific segments: cheap consumer routers, CGI-script WiFi configs, older or custom firmware. On most targets the tool will flag nothing, which is the expected outcome.
+
+The chip-firmware CVE class (Broadpwn, Marvell Avastar, MediaTek wappd, Windows WiFi driver, FreeBSD net80211, Realtek RTL8195A) is **out of scope**. Those need raw 802.11 frame injection with an attacker-controlled SSID IE length, which `WiFi.softAP()` does not produce. See [ATTACK_MODEL.md](ATTACK_MODEL.md) for the broader landscape.
+
+The detector only signals association-time crashes: a quick disconnect under 10 seconds, confirmed by a second disconnect on the same SSID. Second-order classes (XSS, CRLF, NoSQL, JNDI, serialization, terminal escape, path) deliver the SSID into the air but the injection fires in a target-side component the detector cannot see. For those, the tool is delivery, verification is on you.
 
 ---
 
@@ -17,6 +29,23 @@
 
 > **For authorized security testing and research only.**
 > This tool is designed for IoT security professionals to evaluate device behavior under abnormal WiFi SSID input conditions. Use ethically, legally, and only on devices you own or have written authorization to test.
+
+---
+
+## Capabilities and Limits
+
+What this tool actually delivers, stated plainly:
+
+- **32-byte SSID cap.** Broadcasts use `WiFi.softAP()`, which enforces the IEEE 802.11 SSID length limit. Payloads longer than 32 bytes are not supported. Raw 802.11 frame injection via `esp_wifi_80211_tx()` is a future direction (see [ATTACK_MODEL.md](ATTACK_MODEL.md#future-work)), not implemented in the current firmware.
+- **Most categories require target-side conditions beyond beacon receipt.** Command injection requires the target to feed the SSID to a shell on association. XSS / CRLF / path-traversal / NoSQL / JNDI categories deliver the string in a beacon, but the actual injection only fires when the target's web UI, config parser, or logger consumes the stored SSID through a vulnerable code path. These are real attack surfaces, they just aren't always triggered by broadcast alone. Payload categories are tiered below to reflect this.
+- **Detector is heuristic, not ground truth, and narrow in scope.** A device disconnecting quickly from the AP may indicate a crash or may indicate normal behavior (open AP, no internet, captive-portal probe failed). The detector requires the same SSID to produce ≥2 quick disconnects within its broadcast window before raising a `Quick Disconnect` alert, and even then "save to results" is a human judgment call, not a confirmation of exploitation. **The detector only signals association-time crashes.** Second-order categories (XSS / CRLF / path / NoSQL / JNDI / serialization / terminal-escape) deliver the SSID but the actual injection happens elsewhere on the target, you must observe those on the target side (admin browser, target logs, web requests).
+- **ESP32 and ESP8266 are not equivalent.** Both targets work; ESP32 has richer WiFi APIs and is preferred for future raw-frame work.
+- **Chip-firmware-level CVEs (Broadpwn, Marvell Avastar, MediaTek wappd, Windows WiFi driver, etc.) are NOT reachable from this tool today.** They require raw frame manipulation with attacker-controlled IE length bytes. They are referenced in [ATTACK_MODEL.md](ATTACK_MODEL.md) for context only.
+
+### Known Issues
+
+- **11 payloads containing `\n` / `\r` (newline / CRLF) report a truncated SSID in the dashboard.** The firmware uses a line-based serial protocol (`CIW:SSID:<text>\n`), so an SSID that itself contains a newline splits the report across multiple lines and the dashboard records only the portion before the first newline. The 802.11 broadcast may itself be affected too, `WiFi.softAP()` accepts a C string and behavior with embedded `\n` is driver-defined. Affected categories: 2× `wifi_cmd`, 1× `wifi_overflow`, 1× `wifi_probe`, 2× `wifi_esc`, 1× `wifi_serial`, 4× `wifi_crlf`. A future fix would base64-encode the SSID in `CIW:SSID:` reports.
+- **Payloads with embedded `\x00` (null byte) are truncated at the null by the WiFi driver** because `WiFi.softAP()` expects a C string. Affected: 10 payloads (2× `wifi_cmd`, 3× `wifi_overflow`, 2× `wifi_probe`, 3× `wifi_fuzz`). They still appear in the catalog because the truncated prefix is itself a useful fuzz input (e.g. `"reboot"` from `"reboot\x00ignored"` exercises a different code path than `"reboot"` alone), but the broadcast is shorter than the full string.
 
 ---
 ## Research Note
@@ -75,17 +104,9 @@ Once a triggering payload is identified, **target-side analysis** (device logs, 
 
 ## What It Does
 
-CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to test how nearby IoT devices handle malicious SSID names. Vulnerable firmware may:
+CommandInWiFi broadcasts crafted WiFi SSIDs from an ESP32/ESP8266 to probe how nearby devices handle unusual SSID strings. **If** a target's firmware has a specific class of bug (and most targets won't), the SSID text may reach a vulnerable sink, shell call, format-string logger, web renderer, configuration parser. Possible target-side effects in that case include crashes, reboots, command execution, memory disclosure, configuration corruption, XSS, header injection, or downstream injection in stored-then-consumed pipelines. None of these are guaranteed; whether any of them happen depends entirely on the target. The tool's job is to deliver the SSID and to flag association-time crashes; everything else is operator-driven verification on the target.
 
-- **Crash or reboot** when parsing a poisoned SSID
-- **Execute commands** if SSID text reaches a shell/system call (`system()`, `popen()`)
-- **Leak memory** via format string specifiers in SSID (`printf(ssid)`)
-- **Corrupt config files** via serialization injection in stored SSIDs
-- **Trigger XSS** when SSID is rendered in web dashboards without sanitization
-- **Exploit Java IoT** via JNDI/Log4Shell lookups in SSID logging paths
-- **Inject HTTP headers** via CRLF sequences in SSID reflected in responses
-
-The tool includes a **web dashboard** for managing payloads, flashing firmware, monitoring serial output, real-time device tracking, automated vulnerability detection, and recording test results - all from your browser.
+The included **web dashboard** handles payload management, one-click firmware flashing, live serial monitoring, real-time device tracking, quick-disconnect alerting, and a results matrix for recording per-device-per-payload outcomes.
 
 [![Watch the Demo](https://img.youtube.com/vi/XOZeVIV16Os/maxresdefault.jpg)](https://www.youtube.com/watch?v=XOZeVIV16Os)
 
@@ -96,189 +117,15 @@ The tool includes a **web dashboard** for managing payloads, flashing firmware, 
 
 ---
 
-## Architecture Workflow
+## Architecture (in one paragraph)
 
-```
-+-----------------------------------------------------------------------+
-|                        COMMANDINWIFI SYSTEM                           |
-+-----------------------------------------------------------------------+
-
-                    +---------------------------+
-                    |     Web Dashboard         |
-                    |     (Browser UI)          |
-                    |                           |
-                    |  +-----+ +------+ +----+  |
-                    |  | Pay | | Seri | | Re |  |
-                    |  | loa | | al   | | su |  |
-                    |  | ds  | | Mon  | | lt |  |
-                    |  +-----+ +------+ +----+  |
-                    +---------|-----|-----------+
-                     REST API |     | WebSocket
-                     (HTTP)   |     | (ws://serial)
-                              v     v
-                    +---------------------------+
-                    |     FastAPI Backend       |
-                    |     (dashboard/app.py)    |
-                    |                           |
-                    |  +----------+ +--------+  |
-                    |  | SQLite   | | Serial |  |
-                    |  | Database | | Manager|  |
-                    |  | (CRUD)   | | (I/O)  |  |
-                    |  +----------+ +--------+  |
-                    +--------------|-------------+
-                                  | USB Serial (115200 baud)
-                                  | CIW Protocol (line-based)
-                                  v
-                    +---------------------------+
-                    |   ESP32 / ESP8266         |
-                    |   (CommandInWiFi.ino)     |
-                    |                           |
-                    |   WiFi AP Mode            |
-                    |   CIW Protocol Handler    |
-                    +---------------------------+
-                                |
-                  Beacon Frames |
-                  (Malicious    |
-                   SSIDs)       |
-                                v
-                    +---------------------------+
-                    |    Target IoT Devices     |
-                    |                           |
-                    |  Scan WiFi -> Parse SSID  |
-                    |  Connect -> Process SSID  |
-                    |                           |
-                    |  Possible outcomes:       |
-                    |  - Crash / Reboot         |
-                    |  - Command Execution      |
-                    |  - Memory Leak            |
-                    |  - Config Corruption      |
-                    +---------------------------+
-```
-
----
-
-## Data Flow Diagram
-
-```
-+-------------------+        +-------------------+        +-------------------+
-|   PAYLOAD DEPLOY  |        |   SSID BROADCAST  |        |  VULN DETECTION   |
-+-------------------+        +-------------------+        +-------------------+
-
-Dashboard                     ESP Firmware                  Serial Manager
-    |                             |                             |
-    | 1. Select payloads          |                             |
-    | 2. Click "Deploy"           |                             |
-    |                             |                             |
-    |--- POST /api/deploy ------->|                             |
-    |                             |                             |
-    | 3. CIW:CLEAR                |                             |
-    |--- serial write ----------->|                             |
-    |                             | CIW:OK:CLEAR                |
-    |<--- serial read ------------|                             |
-    |                             |                             |
-    | 4. CIW:ADD:<base64>         |                             |
-    |--- serial write ----------->|                             |
-    |    (for each payload)       | CIW:OK:ADD:<index>          |
-    |<--- serial read ------------|                             |
-    |                             |                             |
-    | 5. CIW:START                |                             |
-    |--- serial write ----------->|                             |
-    |                             | CIW:OK:START:<count>        |
-    |<--- serial read ------------|                             |
-    |                             |                             |
-    |                             | 6. WiFi.softAP(ssid)        |
-    |                             |--- broadcast SSID --------->|
-    |                             |                             |
-    |                             | CIW:SSID:<current_ssid>     |
-    |<--- serial read ------------|--- track SSID change ------>|
-    |                             |                             |
-    |                             | 7. Target connects to AP    |
-    |                             |                             |
-    |                             | CIW:STA_CONNECT:<mac>|<ssid>|
-    |<--- serial read ------------|--- log connect time ------->|
-    |                             |                             |
-    |                             | 8. Target disconnects       |
-    |                             |                             |
-    |                             | CIW:STA_DISCONNECT:<mac>    |
-    |<--- serial read ------------|--- analyze timing --------->|
-    |                             |                      duration < 10s?
-    |                             |                      = possible crash
-    |                             |                             |
-    |                             |              CRASH alert -->|
-    |                             |              via WebSocket  |
-    |<--- ws://serial ------------|<----------------------------|
-
-```
-
----
-
-## Vulnerability Detection Workflow
-
-```
-                        +------------------+
-                        | ESP Broadcasts   |
-                        | Malicious SSID   |
-                        +--------+---------+
-                                 |
-                                 v
-                    +------------------------+
-                    | Target device connects |
-                    | to malicious AP        |
-                    +--------+---------------+
-                             |
-                    CIW:STA_CONNECT:<mac>|<ssid>
-                    Serial Manager logs connect time
-                             |
-                             v
-                    +------------------------+
-                    | Target disconnects     |
-                    +--------+---------------+
-                             |
-                    CIW:STA_DISCONNECT:<mac>|<ssid>
-                             |
-                     +-------+-------+
-                     |               |
-                     v               v
-              +-----------+   +--------------+
-              | duration  |   | duration     |
-              | < 10s     |   | >= 10s       |
-              +-----------+   +--------------+
-                     |               |
-                     v               v
-              +-----------+   +--------------+
-              | SSID just |   | Normal       |
-              | rotated?  |   | disconnect   |
-              | (< 5s)    |   | (no alert)   |
-              +-----+-----+   +--------------+
-                    |
-              +-----+-----+
-              | NO        | YES
-              v           v
-        +-----------+ +--------------+
-        | CRASH     | | Filtered     |
-        | DETECTED  | | (false       |
-        |           | |  positive)   |
-        +-----------+ +--------------+
-              |
-              v
-        +-------------------+
-        | Cooldown check    |
-        | (30s per MAC)     |
-        +--------+----------+
-                 |
-                 v
-        +-------------------+
-        | Alert shown in    |
-        | Vuln Alerts panel |
-        | Save to Results   |
-        +-------------------+
-```
+ESP32/ESP8266 firmware broadcasts SSIDs via `WiFi.softAP()`, cycling through a queue every two minutes, and reports station connect/disconnect events over USB serial using a line-based protocol (`CIW:...`). A FastAPI backend manages a SQLite-backed payload catalog, drives deployment, parses serial output, and exposes a WebSocket for live monitoring. A single-page browser dashboard handles payload selection, deployment, serial monitoring, and result recording. The detector runs entirely in the backend's serial parser and only signals quick disconnects with per-SSID confirmation (see [Vulnerability Detection](#vulnerability-detection) below). Source: [dashboard/](dashboard/), [CommandInWiFi.ino](CommandInWiFi.ino).
 
 ---
 
 ## Features
 
-- **157 payloads** across 14 attack categories (pre-loaded)
+- **133 payloads** across 13 attack categories, tiered by delivery feasibility (pre-loaded)
 - **Web Dashboard** - manage payloads, deploy to ESP, monitor serial, record results
 - **One-Click Flash** - compile and flash firmware to ESP32/ESP8266 from the dashboard
 - **Board Selection** - choose target board (ESP32 or ESP8266) before flashing
@@ -310,7 +157,7 @@ CommandInWiFi-Zeroclick/
 ├── dashboard/
 │   ├── __init__.py
 │   ├── app.py                 # FastAPI backend (REST + WebSocket)
-│   ├── database.py            # SQLite schema + 157 default payloads
+│   ├── database.py            # SQLite schema + 133 default payloads
 │   ├── serial_manager.py      # Serial I/O, deploy, flash, vuln detection
 │   ├── requirements.txt       # Python dependencies
 │   ├── templates/
@@ -379,22 +226,41 @@ Open **http://localhost:8000** in your browser.
 
 ## Payload Categories
 
+Payloads are grouped by how the injection actually fires, not by what they look like. This matters: a `<script>` payload broadcast in an SSID does nothing unless a target component renders it.
+
+### Direct (beacon-deliverable)
+
+The target processes the SSID during scan or scan-result logging. Bug fires before/without association.
+
 | Category | Count | Description |
-|----------|-------|-------------|
-| `wifi_cmd` | 25 | Shell command injection via pipe, backtick, semicolon, subshell, PowerShell, BusyBox |
-| `wifi_overflow` | 26 | Buffer overflow / boundary fuzzing (32/64/128-byte boundaries + off-by-one). *Note: `WiFi.softAP()` truncates at 32 bytes; >32-byte payloads require raw frame injection.* |
-| `wifi_fmt` | 15 | Format string attacks (`%s`, `%n`, `%x` for crash/leak/write) |
-| `wifi_probe` | 14 | Malformed SSIDs (null bytes, control chars, Unicode edge cases, WiFi Direct spoof) |
-| `wifi_esc` | 8 | Terminal/log escape injection (ANSI codes in SSID) |
-| `wifi_serial` | 13 | Serialization injection (JSON/XML/SQL/template/CSV/DDE/YAML/PHP in SSID) |
-| `wifi_enc` | 8 | Encoding normalization attacks (fullwidth Unicode, URL-encode) |
-| `wifi_chain` | 8 | Multi-SSID chain attacks (split payload across sequential SSIDs) |
-| `wifi_heap` | 8 | Memory corruption primitives (heap metadata, canary patterns) |
-| `wifi_xss` | 8 | XSS / Web UI injection (SSIDs rendered unsanitized in IoT dashboards) |
-| `wifi_path` | 6 | Path traversal (SSID used in filesystem paths by firmware) |
-| `wifi_crlf` | 6 | CRLF / HTTP header injection (SSID reflected in HTTP responses) |
-| `wifi_jndi` | 6 | JNDI / Expression Language (Log4Shell, Spring EL in Java-based IoT) |
-| `wifi_nosql` | 6 | NoSQL / LDAP injection (MongoDB operators, LDAP filter injection) |
+|---|---|---|
+| `wifi_fmt` | 15 | Format string attacks (`%s`, `%n`, `%x`). Real precedent: CVE-2021-30800 (iOS `wifid`). |
+| `wifi_probe` | 14 | Malformed SSIDs (null bytes, control chars, Unicode edge cases, WiFi Direct spoof). Generic parser fuzzing. |
+
+### Association-required
+
+The target associates with the AP and processes the SSID via a shell, logger, or config code. Most known SSID-CVEs sit here (CVE-2023-45208 D-Link, CVE-2017-2915 Circle).
+
+| Category | Count | Description |
+|---|---|---|
+| `wifi_cmd` | 25 | Shell command injection via pipe, backtick, semicolon, subshell, IFS, BusyBox, PowerShell. Some targets fire at scan time, some at connect/config-store time. |
+| `wifi_overflow` | 10 | 32-byte boundary fills and off-by-ones for fixed-size SSID buffers (>32-byte payloads removed, see Capabilities and Limits). |
+| `wifi_enc` | 8 | Unicode fullwidth + URL-encoded shell metacharacters. Only fires if the target performs Unicode/URL normalization before shell exec, no documented WiFi CVE in this class; included as a defensive-research probe for filter bypasses. |
+| `wifi_fuzz` | 8 | Byte-pattern fuzz inputs (debug-allocator markers, repeating bytes) for parser fault discovery. *Note: these are fuzz patterns, not exploit primitives, a 32-byte SSID broadcast cannot corrupt a target's heap on its own.* |
+
+### Second-order (stored, then consumed by a different component)
+
+Beacon delivers the SSID; the injection fires later, when a separate component on the target reads the stored value. Requires that second component to exist *and* to be reachable. **The automated `Quick Disconnect` detector does NOT signal these, they must be observed manually on the target side** (admin browser, target logs, etc.).
+
+| Category | Count | Description | Required second component |
+|---|---|---|---|
+| `wifi_xss` | 8 | HTML / JS injection. | Web admin UI that renders scan results unsanitized (DD-WRT, BT Home Hub, Trendnet, TP-Link). |
+| `wifi_serial` | 13 | JSON / XML / SQL / template / CSV / YAML / PHP injection. | Config storage or rendering code that re-parses stored SSIDs. |
+| `wifi_esc` | 8 | ANSI escape injection. | A terminal viewer reading a log/syslog/serial stream that contains the SSID. |
+| `wifi_path` | 6 | Directory traversal. | Firmware using SSID as a filesystem path component (rare). |
+| `wifi_crlf` | 6 | HTTP header injection. | Web interface reflecting SSID into response headers. |
+| `wifi_jndi` | 6 | Log4Shell / Spring EL. | Java-based logger ingesting SSIDs (rare on consumer IoT; relevant for enterprise APs). |
+| `wifi_nosql` | 6 | MongoDB / LDAP filter injection. | Backend storing or querying SSIDs in NoSQL / LDAP (enterprise IoT). |
 
 ---
 

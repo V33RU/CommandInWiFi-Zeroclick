@@ -17,7 +17,7 @@ serial_manager = SerialManager()
 
 VALID_CATEGORIES = [
     "wifi_cmd", "wifi_overflow", "wifi_fmt", "wifi_probe",
-    "wifi_esc", "wifi_serial", "wifi_enc", "wifi_chain", "wifi_heap",
+    "wifi_esc", "wifi_serial", "wifi_enc", "wifi_fuzz",
     "wifi_xss", "wifi_path", "wifi_crlf", "wifi_jndi", "wifi_nosql",
     "custom",
 ]
@@ -331,9 +331,13 @@ def save_vuln_result(req: VulnSaveRequest):
         conn.close()
         raise HTTPException(404, f"No payload matches SSID: {req.ssid}")
 
-    status_map = {"crash": "crashed", "reboot": "rebooted"}
+    status_map = {
+        "quick_disconnect": "crashed",
+        "crash": "crashed",
+        "reboot": "rebooted",
+    }
     status = status_map.get(req.vuln_type, "unknown")
-    notes = f"Auto-detected — {req.vuln_type}"
+    notes = f"Auto-detected, {req.vuln_type} (operator-confirmed on save)"
 
     cur = conn.execute(
         "INSERT INTO results (payload_id, device_name, device_mac, status, notes) VALUES (?, ?, ?, ?, ?)",

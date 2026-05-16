@@ -1,8 +1,19 @@
 # Attack Model WiFi SSID as a Zero-Click Attack Surface
 
 > This document provides an in-depth technical analysis of the WiFi SSID attack surface,
-> real-world CVEs, vulnerable code patterns, and how CommandInWiFi maps its 157 payloads
+> real-world CVEs, vulnerable code patterns, and how CommandInWiFi maps its 133 payloads
 > to each vulnerability class.
+
+> ### Tool Scope Note
+>
+> This document catalogues the WiFi-SSID attack surface broadly, including CVEs and
+> classes this specific framework **cannot** deliver from its current `WiFi.softAP()`-based
+> broadcaster. Each category and CVE row below is annotated with a delivery-feasibility tag:
+>
+> - **D**, beacon-deliverable. Bug fires during scan / scan-result logging on the target. The current tool can drive this.
+> - **A**, requires target association. The target must connect to the malicious AP for the SSID to reach the vulnerable code path. The current tool can drive this, subject to the 32-byte SSID cap.
+> - **S**, requires a second-order target component (web admin UI, config parser, Java logger, NoSQL backend, etc.) to consume the stored SSID through a vulnerable code path. The current tool delivers the SSID; the actual injection happens elsewhere and depends on the target's software stack.
+> - **R**, requires raw 802.11 frame injection with attacker-controlled IE length bytes. **Not implemented in this tool.** Most chip-firmware-level CVEs sit here. See [Future Work](#future-work).
 
 ---
 
@@ -22,10 +33,11 @@
   - [3.9 NoSQL / LDAP Injection](#39-nosql--ldap-injection)
   - [3.10 Terminal Escape Injection](#310-terminal-escape-injection)
   - [3.11 Encoding Normalization](#311-encoding-normalization)
-  - [3.12 Memory Corruption Primitives](#312-memory-corruption-primitives)
+  - [3.12 Byte-Pattern Fuzzing](#312-byte-pattern-fuzzing)
 - [4. Daemons and Services That Parse SSIDs](#4-daemons-and-services-that-parse-ssids)
 - [5. Detection Methodology](#5-detection-methodology)
 - [6. Real-World CVE Reference Table](#6-real-world-cve-reference-table)
+- [Future Work](#future-work)
 - [7. Academic Research and Further Reading](#7-academic-research-and-further-reading)
 
 ---
@@ -125,6 +137,8 @@ This is the same attack class behind:
 
 ### 3.1 Command Injection
 
+**Delivery: A or D**, depends on the target. Some firmware wraps WiFi scanning in a shell call (`parse_ap_list` → `system()`), making the bug fire at scan time without association (D). Others trigger only on connect or config-store (A). The tool delivers both paths.
+
 **Likelihood: High.** Multiple confirmed CVEs. Common in embedded Linux firmware that wraps WiFi utilities via shell calls.
 
 **How it works:** The SSID string reaches a shell execution function (`system()`, `popen()`, `exec()`) without sanitization. Shell metacharacters in the SSID (`|`, `;`, `` ` ``, `$()`) are interpreted as command operators.
@@ -162,6 +176,8 @@ os.popen(f"nmcli dev wifi connect '{ssid}'")
 ---
 
 ### 3.2 Buffer Overflow
+
+**Delivery: A** for ≤32-byte SSIDs (boundary fuzzing of fixed-size buffers). **R** for >32-byte payloads, most CVEs in this class require raw frame injection because the SSID IE length byte must exceed the IEEE 32-byte limit, which `WiFi.softAP()` will not produce.
 
 **Likelihood: High.** Most common WiFi vulnerability class - responsible for the majority of WiFi chip/driver CVEs.
 
@@ -201,15 +217,15 @@ struct p2p_device {
 | CVE-2020-9395 | Realtek RTL8195A | Stack | Arbitrary | WiFi module takeover without password |
 | CVE-2025-3328 | Tenda AC1206 | Stack | Arbitrary | System compromise via SSID parameter |
 
-**CommandInWiFi payloads:** `wifi_overflow` category (26 payloads) - 32-byte boundary fills, 64-byte buffer fills, 128-byte buffer fills, off-by-one (33 and 65 bytes), null-terminated boundaries, CRLF at boundary, canary detection, overflow+format hybrids.
+**CommandInWiFi payloads:** `wifi_overflow` category (10 payloads, all ≤32 bytes), 32-byte boundary fills, null-terminated boundary, DEL fill, control-byte fill, CRLF at boundary, off-by-one (`A * 31 + 0x7f`).
 
-**Why 64 and 128 byte payloads:** Many embedded C firmwares use `char ssid[64]` or `char buf[128]` for SSID storage. The IEEE 802.11 32-byte limit is at the protocol level, but internal buffers are often power-of-two sized. Testing at these boundaries catches different allocator and compiler alignment bugs.
-
-**Current limitation:** The ESP firmware uses `WiFi.softAP()`, which enforces the 32-byte SSID limit - payloads longer than 32 bytes are truncated by the WiFi driver. To broadcast oversized SSIDs, raw beacon frame injection via `esp_wifi_80211_tx()` is required (crafting the 802.11 frame with a Length field > 32 in the SSID IE). The >32-byte payloads are included in the database for future raw-frame firmware support and for reference when testing via other injection methods.
+**Why only 32-byte payloads:** `WiFi.softAP()` enforces the IEEE 32-byte SSID length limit at the WiFi driver level, anything longer is truncated before transmission. The chip-firmware-class buffer overflows in the CVE table below (Broadpwn, Marvell Avastar, MediaTek wappd, etc.) **cannot** be reproduced from this tool today, because they require crafting a beacon with an attacker-controlled SSID IE length byte ≥ 33. That capability requires raw 802.11 frame injection via `esp_wifi_80211_tx()` and is documented as [Future Work](#future-work). The 32-byte payloads ship here as boundary-fuzzing primitives for fixed-size SSID buffers in association-time code paths.
 
 ---
 
 ### 3.3 Format String
+
+**Delivery: D** (when the SSID is logged during scan, e.g. `syslog(LOG_INFO, ssid)` in a WiFi daemon) **or A** (when logged after association).
 
 **Likelihood: Medium-High.** Proven by WiFiDemon (iOS CVE-2021-30800). Less common than buffer overflows but devastating when present.
 
@@ -240,6 +256,8 @@ printf("%s", ssid);
 ---
 
 ### 3.4 XSS / Web UI Injection
+
+**Delivery: S**, beacon delivers the SSID; the actual injection only fires when an admin opens the target's Site Survey page and the SSID is rendered unescaped.
 
 **Likelihood: Medium-High.** Multiple confirmed CVEs across router vendors. Any IoT device with a web-based "Site Survey" page is a potential target.
 
@@ -285,6 +303,8 @@ Admin cookies exfiltrated / router config changed / firmware replaced
 
 ### 3.5 Serialization / Config Injection
 
+**Delivery: S**, the SSID is first stored (after association or scan-history persistence), then consumed by a separate config/serialization parser. Both steps must exist on the target.
+
 **How it works:** IoT firmware stores scanned or connected SSIDs in configuration files (JSON, XML, INI, SQLite). If the SSID is written without escaping, it can break the file structure and inject new keys, values, or SQL statements.
 
 **Vulnerable code pattern:**
@@ -311,6 +331,8 @@ sqlite3_exec(db, query, NULL, NULL, NULL);
 
 ### 3.6 CRLF / HTTP Header Injection
 
+**Delivery: S**, beacon delivers the SSID; the injection only fires when a web interface (captive portal, status page) reflects the SSID into an HTTP response without stripping CR/LF.
+
 **How it works:** IoT web interfaces that reflect the SSID in HTTP responses (captive portals, status pages) may not strip carriage return / line feed characters. CRLF in the SSID injects arbitrary HTTP headers or splits the response to inject body content.
 
 **Vulnerable code pattern:**
@@ -327,6 +349,8 @@ response.headers["X-Current-Network"] = ssid
 ---
 
 ### 3.7 JNDI / Expression Language
+
+**Delivery: S**, requires a Java logger on the target ingesting SSIDs through a vulnerable framework (Log4j, Spring EL). Rare on consumer IoT; relevant for enterprise WiFi-management platforms.
 
 **Likelihood: Low-Medium.** Applies primarily to enterprise-grade APs and Java-based IoT gateways. Consumer IoT devices rarely run Java. Included because Log4Shell demonstrated that *any* logged string can be an attack vector, and enterprise WiFi management platforms (Cisco, Aruba, Ruckus) do log SSIDs.
 
@@ -353,6 +377,8 @@ Attacker serves malicious Java class → RCE on target
 
 ### 3.8 Path Traversal
 
+**Delivery: S**, beacon delivers the SSID; the injection only fires when the target uses the SSID as a filename or path component (e.g. per-network log file).
+
 **Likelihood: Low.** Requires firmware that uses the SSID directly as a filename or path component - uncommon but not impossible in custom IoT firmware that logs WiFi scan results to per-network files.
 
 **How it works:** Firmware that stores SSID scan history or logs on the filesystem may use the SSID as part of a file path. Directory traversal sequences (`../`) in the SSID can escape the intended directory.
@@ -374,6 +400,8 @@ with open(log_path, 'w') as f:
 
 ### 3.9 NoSQL / LDAP Injection
 
+**Delivery: S**, requires the target to store or query SSIDs through a NoSQL backend or LDAP filter on a separate code path. Primarily enterprise IoT.
+
 **Likelihood: Low.** Primarily targets enterprise network appliances and cloud-connected IoT gateways that store WiFi metadata in NoSQL databases or authenticate via LDAP. Rare in consumer devices but present in enterprise WiFi management systems.
 
 **How it works:** IoT devices using MongoDB or LDAP for network management may query using SSID values. MongoDB operator injection (`$gt`, `$ne`, `$regex`) or LDAP filter injection can bypass authentication or leak data.
@@ -384,6 +412,8 @@ with open(log_path, 'w') as f:
 
 ### 3.10 Terminal Escape Injection
 
+**Delivery: S**, the bug fires not when the SSID is broadcast or stored, but when an operator (or a downstream piece of software) reads the resulting log file or serial output through a terminal that interprets ANSI escapes. The tool delivers the SSID; the second-order consumer is the log viewer.
+
 **How it works:** SSIDs logged to serial consoles, syslog, or terminal emulators may contain ANSI escape sequences. These can clear the screen, hide text, inject fake log entries, or trigger terminal-specific vulnerabilities like cursor position reporting (which injects characters into stdin).
 
 **CommandInWiFi payloads:** `wifi_esc` category (8 payloads) - screen clear, terminal title change, cursor position report (stdin injection), alt screen buffer, colored fake log entries, log line overwrite, hidden text mode.
@@ -391,6 +421,8 @@ with open(log_path, 'w') as f:
 ---
 
 ### 3.11 Encoding Normalization
+
+**Delivery: A**, fires only if the target normalizes Unicode/URL-encoded sequences to ASCII before passing the SSID to a shell or query. Behavior is target-specific.
 
 **How it works:** Unicode fullwidth characters visually resemble ASCII but have different codepoints. If a filter blocks ASCII shell metacharacters but the backend normalizes Unicode to ASCII (NFKC/NFKD), fullwidth versions bypass the filter and become dangerous after normalization.
 
@@ -400,11 +432,13 @@ with open(log_path, 'w') as f:
 
 ---
 
-### 3.12 Memory Corruption Primitives
+### 3.12 Byte-Pattern Fuzzing
 
-**How it works:** Specific byte patterns target heap allocator metadata (dlmalloc/newlib used by ESP, FreeRTOS), stack canaries, or memory initialization markers. Unlike generic fuzzing, these patterns are crafted to trigger specific allocator behaviors.
+**Delivery: A**, these are 32-byte byte-pattern fuzz inputs delivered as SSIDs. They are useful for surfacing parser faults in the target's SSID-handling code paths, **not** for exploiting allocator state. A 32-byte SSID broadcast cannot corrupt a target's heap on its own; real allocator-state corruption requires raw frame injection with controlled IE length bytes (see CVEs marked **R** below).
 
-**CommandInWiFi payloads:** `wifi_heap` category (8 payloads) - dlmalloc prev_size overwrite, fake chunk headers, `0xDEADBEEF` canary probe, `INT_MAX` spray, `0xBAADF00D` uninitialized marker, null sled + address overwrite.
+**How it works:** Repeating byte patterns and debug-allocator markers (`0xDEADBEEF`, `0xBAADF00D`, null sleds, alternating high/low bytes) are constructed to be visible in memory dumps and to stress parser boundary handling. The intent is fault discovery, not exploit-primitive delivery.
+
+**CommandInWiFi payloads:** `wifi_fuzz` category (8 payloads), alternating high/low byte patterns, repeating small-int patterns, `0xDEADBEEF` and `0xBAADF00D` markers, near-max-byte sprays, null-sled + ASCII tail.
 
 ---
 
@@ -480,35 +514,49 @@ Once a triggering SSID is identified via behavioral detection, root cause analys
 
 ### SSID-Specific Vulnerabilities
 
-| CVE | Year | Device | Class | CVSS | Zero-Click |
-|-----|------|--------|-------|------|------------|
-| CVE-2021-30800 | 2021 | iOS (wifid) | Format String + UAF | High | Yes (auto-join scan) |
-| CVE-2023-45208 | 2023 | D-Link DAP-X1860 | Command Injection | High | During network setup |
-| CVE-2017-2915 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan |
-| CVE-2017-12094 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan |
-| CVE-2023-42810 | 2023 | Node.js systeminformation | Command Injection | 9.8 | When app scans WiFi |
-| CVE-2015-1863 | 2015 | wpa_supplicant | Heap Overflow (P2P) | High | During P2P scan |
-| CVE-2022-30329 | 2022 | Trendnet TEW-831DR | XSS via SSID | Medium | Admin views scan |
-| CVE-2025-25427 | 2025 | TP-Link WR841N | XSS via SSID | Medium | Admin views scan |
-| CVE-2025-3328 | 2025 | Tenda AC1206 | Buffer Overflow | High | During WiFi setup |
+| CVE | Year | Device | Class | CVSS | Zero-Click | Delivery via this tool |
+|-----|------|--------|-------|------|------------|------------------------|
+| CVE-2021-30800 | 2021 | iOS (wifid) | Format String + UAF | High | Yes (auto-join scan) | **D**, scan-time format string, in scope |
+| CVE-2023-45208 | 2023 | D-Link DAP-X1860 | Command Injection | High | During network setup | **A**, needs association, in scope |
+| CVE-2017-2915 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan | **D**, `parse_ap_list` runs at scan time, no association required, in scope |
+| CVE-2017-12094 | 2017 | Circle with Disney | Command Injection | High | During WiFi scan | **D**, scan-time `sed` invocation on SSID, in scope |
+| CVE-2023-42810 | 2023 | Node.js systeminformation | Command Injection | 9.8 | When app scans WiFi | **D**, fires when host app calls `wifiConnections()` on scan results, in scope |
+| CVE-2015-1863 | 2015 | wpa_supplicant | Heap Overflow (P2P) | High | During P2P scan | **R**, 255-byte SSID IE, requires raw frames |
+| CVE-2022-30329 | 2022 | Trendnet TEW-831DR | XSS via SSID | Medium | Admin views scan | **S**, needs admin to open web UI |
+| CVE-2025-25427 | 2025 | TP-Link WR841N | XSS via SSID | Medium | Admin views scan | **S**, needs admin to open web UI |
+| CVE-2025-3328 | 2025 | Tenda AC1206 | Buffer Overflow | High | During WiFi setup | **A** if ≤32-byte SSID triggers; **R** otherwise |
 
 ### WiFi Chip/Driver Firmware (Zero-Click)
 
-| CVE | Year | Chip/Driver | Class | CVSS | Affected Devices |
-|-----|------|-------------|-------|------|------------------|
-| CVE-2017-9417 | 2017 | Broadcom BCM43xx | Heap Overflow | Critical | Millions of Android/iOS devices |
-| CVE-2019-6496 | 2019 | Marvell Avastar | Block Pool Overflow | High | PS4, Xbox, Surface, Galaxy J1 |
-| CVE-2020-9395 | 2020 | Realtek RTL8195A | Stack Overflow | Critical | IoT WiFi modules |
-| CVE-2024-20017 | 2024 | MediaTek MT7622/7915 | OOB Write | 9.8 | Ubiquiti, Xiaomi, Netgear |
-| CVE-2024-30078 | 2024 | Windows WiFi drivers | Stack Overflow | 8.8 | All Windows 10/11/Server |
-| CVE-2022-23088 | 2022 | FreeBSD kernel 802.11 | Heap Overflow | Critical | pfSense, OPNsense |
+> **All rows in this table are out of scope for the current tool.** They require crafted 802.11 frames with attacker-controlled IE length / fragmentation / aggregation bytes that `WiFi.softAP()` will not produce. They are listed here as the reference attack landscape, not as targets this framework drives. See [Future Work](#future-work).
+
+| CVE | Year | Chip/Driver | Class | CVSS | Affected Devices | Delivery via this tool |
+|-----|------|-------------|-------|------|------------------|------------------------|
+| CVE-2017-9417 | 2017 | Broadcom BCM43xx | Heap Overflow | Critical | Millions of Android/iOS devices | **R** |
+| CVE-2019-6496 | 2019 | Marvell Avastar | Block Pool Overflow | High | PS4, Xbox, Surface, Galaxy J1 | **R** |
+| CVE-2020-9395 | 2020 | Realtek RTL8195A | Stack Overflow | Critical | IoT WiFi modules | **R** |
+| CVE-2024-20017 | 2024 | MediaTek MT7622/7915 | OOB Write | 9.8 | Ubiquiti, Xiaomi, Netgear | **R** |
+| CVE-2024-30078 | 2024 | Windows WiFi drivers | Stack Overflow | 8.8 | All Windows 10/11/Server | **R** |
+| CVE-2022-23088 | 2022 | FreeBSD kernel 802.11 | Heap Overflow | Critical | pfSense, OPNsense | **R** |
 
 ### Protocol-Level
 
-| CVE | Year | Scope | Class | Details |
-|-----|------|-------|-------|---------|
-| CVE-2023-52424 | 2024 | IEEE 802.11 (all) | SSID Confusion | SSID not authenticated in PMK derivation |
-| CVE-2020-24588 | 2021 | IEEE 802.11 (all) | FragAttacks | Frame aggregation/fragmentation flaws |
+| CVE | Year | Scope | Class | Details | Delivery via this tool |
+|-----|------|-------|-------|---------|------------------------|
+| CVE-2023-52424 | 2024 | IEEE 802.11 (all) | SSID Confusion | SSID not authenticated in PMK derivation | **R**, frame-construction primitive |
+| CVE-2020-24588 | 2021 | IEEE 802.11 (all) | FragAttacks | Frame aggregation/fragmentation flaws | **R**, frame-construction primitive |
+
+---
+
+## Future Work
+
+This tool currently uses `WiFi.softAP()` for SSID broadcast, which constrains it to the IEEE 32-byte SSID limit and standard beacon construction. The categories marked **R** in this document, including most chip-firmware-level CVEs (Broadpwn, Marvell Avastar, MediaTek wappd, Realtek RTL8195A, Windows WiFi driver, FreeBSD 802.11) and the protocol-level CVEs (SSID Confusion, FragAttacks), require raw 802.11 frame injection with attacker-controlled IE length / aggregation / fragmentation bytes.
+
+Implementing this on ESP32 via `esp_wifi_80211_tx()` is feasible and is the natural next direction for the project. Once landed, payloads marked **R** above can be added back honestly. Until then, those CVE classes are referenced here for context and are explicitly **not** within the framework's current testing capability.
+
+ESP8266 lacks a clean raw-frame API and will likely remain limited to `WiFi.softAP()` broadcasts; raw-frame work will be ESP32-only.
+
+A secondary improvement direction is the vulnerability detector: probe-after-disconnect tracking (via ESP32 promiscuous mode) would distinguish "device crashed" from "device left voluntarily" more reliably than the current quick-disconnect-confirmation heuristic.
 
 ---
 

