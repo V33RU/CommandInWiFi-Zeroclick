@@ -202,7 +202,54 @@ td code {
 .cat-wifi_crlf { background: rgba(51, 153, 255, 0.2); color: #3399ff; }
 .cat-wifi_jndi { background: rgba(255, 153, 51, 0.2); color: #ff9933; }
 .cat-wifi_nosql { background: rgba(153, 102, 255, 0.2); color: #9966ff; }
+
+/* BLE category badges, using cooler blue/cyan tones to distinguish radio */
+.cat-ble_cmd      { background: rgba(0, 150, 255, 0.2); color: #4ab8ff; }
+.cat-ble_fmt      { background: rgba(0, 200, 200, 0.2); color: #5ee0e0; }
+.cat-ble_overflow { background: rgba(80, 120, 220, 0.25); color: #7da6ff; }
+.cat-ble_probe    { background: rgba(140, 100, 220, 0.2); color: #b08fff; }
+.cat-ble_xss      { background: rgba(200, 100, 255, 0.2); color: #d28fff; }
+
 .cat-custom { background: rgba(136, 136, 136, 0.2); color: var(--text-secondary); }
+
+/* Header radio-mode chip */
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.radio-mode {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+.radio-mode-label {
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.radio-mode select {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+    cursor: pointer;
+}
+.hint {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-secondary);
+    font-size: 11px;
+}
 
 /* Modal */
 .modal {

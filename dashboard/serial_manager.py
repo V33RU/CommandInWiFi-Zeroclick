@@ -23,7 +23,13 @@ class SerialManager:
         self._task: asyncio.Task | None = None
         self.deploy_status: str = "idle"  # idle, deploying, broadcasting, stopped
         self.deploy_count: int = 0
-        # Device tracking
+        # Radio mode: 'wifi', 'ble', or 'both'. Set by the dashboard via
+        # CIW:MODE:<mode>. Firmware echoes back CIW:MODE:<mode> so we stay
+        # in sync if the ESP rejects a mode (e.g. ESP8266 has no BLE radio).
+        self.radio_mode: str = "wifi"
+        # Device tracking. SSID is the WiFi name field; for BLE we also use
+        # current_ssid to hold the active BLE local name (single string keeps
+        # the detector logic uniform across radios).
         self.current_ssid: str = ""
         self.last_ssid_change: float = 0.0
         self.devices: dict[str, dict] = {}  # mac -> {connected_at, ssid}
@@ -109,9 +115,23 @@ class SerialManager:
             self.current_ssid = new_ssid
             self.last_ssid_change = time.time()
         elif line.startswith("CIW:STA_CONNECT:"):
-            self._handle_device_connect(line[16:])
+            self._handle_device_connect(line[16:], radio="wifi")
         elif line.startswith("CIW:STA_DISCONNECT:"):
-            self._handle_device_disconnect(line[19:])
+            self._handle_device_disconnect(line[19:], radio="wifi")
+        elif line.startswith("CIW:BLE_CONNECT:"):
+            # A central device connected to our GATT server (or attempted to).
+            self._handle_device_connect(line[16:], radio="ble")
+        elif line.startswith("CIW:BLE_DISCONNECT:"):
+            self._handle_device_disconnect(line[19:], radio="ble")
+        elif line.startswith("CIW:BLE_SCAN:"):
+            # A scanner saw our advertisement. We log this as an event but
+            # do not treat it as a connect for detection purposes, because
+            # most scanners see every advertisement and would create noise.
+            self._handle_ble_scan(line[13:])
+        elif line.startswith("CIW:MODE:"):
+            mode = line[9:].strip().lower()
+            if mode in ("wifi", "ble", "both"):
+                self.radio_mode = mode
 
     @staticmethod
     def _parse_mac_ssid(data: str) -> tuple[str, str]:
@@ -126,21 +146,40 @@ class SerialManager:
         # Fallback: no pipe found, treat entire string as MAC
         return data, ""
 
-    def _handle_device_connect(self, data: str) -> None:
-        """Track device connection."""
+    def _handle_device_connect(self, data: str, radio: str = "wifi") -> None:
+        """Track device connection on either WiFi or BLE."""
         mac, ssid = self._parse_mac_ssid(data)
         if not ssid:
             ssid = self.current_ssid
         now = time.time()
 
-        self.devices[mac] = {"connected_at": now, "ssid": ssid}
+        self.devices[mac] = {"connected_at": now, "ssid": ssid, "radio": radio}
         event = {
-            "type": "connect", "mac": mac, "ssid": ssid, "time": now,
+            "type": "connect", "mac": mac, "ssid": ssid,
+            "radio": radio, "time": now,
         }
         self._push_event(event)
 
-    def _handle_device_disconnect(self, data: str) -> None:
-        """Track device disconnection and detect vulnerability (time-based)."""
+    def _handle_ble_scan(self, data: str) -> None:
+        """Record that a scanner saw our BLE advertisement.
+
+        Pure log event, no detection action. Scanners commonly see every
+        advertisement; treating each one as a connect would flood the log.
+        """
+        mac, name = self._parse_mac_ssid(data)
+        if not name:
+            name = self.current_ssid
+        self._push_event({
+            "type": "ble_scan", "mac": mac, "ssid": name,
+            "radio": "ble", "time": time.time(),
+        })
+
+    def _handle_device_disconnect(self, data: str, radio: str = "wifi") -> None:
+        """Track disconnect and run the quick-disconnect heuristic.
+
+        Works for both WiFi and BLE. Same N>=2 confirmation applies because
+        BLE central devices also drop fast on advert parse failure.
+        """
         mac, ssid = self._parse_mac_ssid(data)
         if not ssid:
             ssid = self.current_ssid
@@ -153,13 +192,13 @@ class SerialManager:
             connect_ssid = self.devices[mac]["ssid"]
             del self.devices[mac]
 
-        # Ignore disconnects caused by SSID rotation (expected)
+        # Ignore disconnects caused by SSID/name rotation (expected churn).
         if (now - self.last_ssid_change) < 5.0:
             return
 
         event: dict = {
             "type": "disconnect", "mac": mac, "ssid": connect_ssid,
-            "time": now, "duration": round(duration, 1),
+            "radio": radio, "time": now, "duration": round(duration, 1),
         }
 
         # Heuristic detection: a quick disconnect (<10s) MAY indicate a
@@ -217,6 +256,25 @@ class SerialManager:
         """Send a CIW protocol command to the ESP."""
         self.write(cmd)
 
+    async def set_mode(self, mode: str) -> dict:
+        """Tell the firmware which radio(s) to broadcast on.
+
+        Valid values: 'wifi', 'ble', 'both'. ESP8266 firmware will reject
+        anything other than 'wifi' since it has no BLE radio. The dashboard
+        watches CIW:MODE: lines coming back to confirm.
+        """
+        if mode not in ("wifi", "ble", "both"):
+            return {"ok": False, "error": f"Invalid mode: {mode}"}
+        if not self.serial_conn or not self.serial_conn.is_open:
+            # Track the user's intent even when serial is offline so the
+            # next connect will already be in the right state.
+            self.radio_mode = mode
+            return {"ok": False, "error": "Serial not connected"}
+        self.radio_mode = mode
+        self.send_command(f"CIW:MODE:{mode}")
+        await self._broadcast(f"[MODE] Requested radio mode: {mode}")
+        return {"ok": True, "mode": mode}
+
     async def push_payloads(self, payload_texts: list[str]) -> dict:
         """Deploy payloads to ESP via CIW serial protocol."""
         if not self.serial_conn or not self.serial_conn.is_open:
@@ -226,7 +284,15 @@ class SerialManager:
         self.deploy_status = "deploying"
         self.deploy_count = total
 
-        await self._broadcast(f"[DEPLOY] Starting deploy of {total} payload(s) to ESP...")
+        await self._broadcast(
+            f"[DEPLOY] Starting deploy of {total} payload(s) to ESP "
+            f"(radio mode: {self.radio_mode})..."
+        )
+
+        # Re-assert mode every deploy. Firmware reboots reset to 'wifi'
+        # default, so this prevents silent drift if the ESP rebooted.
+        self.send_command(f"CIW:MODE:{self.radio_mode}")
+        await asyncio.sleep(0.1)
 
         self.send_command("CIW:CLEAR")
         await asyncio.sleep(0.15)

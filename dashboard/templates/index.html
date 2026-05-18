@@ -4,16 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CommandInWiFi Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css?v=10">
+    <link rel="stylesheet" href="/static/style.css?v=11">
 </head>
 <body>
     <header>
-        <h1>CommandInWiFi <span class="subtitle">// Zero-Click SSID Injection</span></h1>
-        <nav id="tabs">
-            <button class="tab active" data-panel="payloads">Payloads</button>
-            <button class="tab" data-panel="results">Results Matrix</button>
-            <button class="tab" data-panel="serial">Serial Monitor</button>
-        </nav>
+        <h1>CommandInWiFi <span class="subtitle">// SSID + BLE Name Injection</span></h1>
+        <div class="header-controls">
+            <div class="radio-mode" title="Which radio the ESP broadcasts on. ESP8266 supports wifi only.">
+                <span class="radio-mode-label">Radio:</span>
+                <select id="radio-mode-select">
+                    <option value="wifi">WiFi (SSID)</option>
+                    <option value="ble">Bluetooth LE (Name)</option>
+                    <option value="both">Both (ESP32 only)</option>
+                </select>
+            </div>
+            <nav id="tabs">
+                <button class="tab active" data-panel="payloads">Payloads</button>
+                <button class="tab" data-panel="results">Results Matrix</button>
+                <button class="tab" data-panel="serial">Serial Monitor</button>
+            </nav>
+        </div>
     </header>
 
     <main>
@@ -22,19 +32,28 @@
             <div class="toolbar">
                 <select id="category-filter">
                     <option value="">All Categories</option>
-                    <option value="wifi_cmd">Command Injection</option>
-                    <option value="wifi_overflow">Overflow / Fuzzing</option>
-                    <option value="wifi_fmt">Format String</option>
-                    <option value="wifi_probe">Probe / Malformed</option>
-                    <option value="wifi_esc">Terminal Escape</option>
-                    <option value="wifi_serial">Serialization Inject</option>
-                    <option value="wifi_enc">Encoding Attack</option>
-                    <option value="wifi_fuzz">Byte-Pattern Fuzzing</option>
-                    <option value="wifi_xss">XSS / Web UI</option>
-                    <option value="wifi_path">Path Traversal</option>
-                    <option value="wifi_crlf">CRLF / Header Inject</option>
-                    <option value="wifi_jndi">JNDI / Expression Lang</option>
-                    <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                    <optgroup label="WiFi (SSID)">
+                        <option value="wifi_cmd">Command Injection</option>
+                        <option value="wifi_overflow">Overflow / Fuzzing</option>
+                        <option value="wifi_fmt">Format String</option>
+                        <option value="wifi_probe">Probe / Malformed</option>
+                        <option value="wifi_esc">Terminal Escape</option>
+                        <option value="wifi_serial">Serialization Inject</option>
+                        <option value="wifi_enc">Encoding Attack</option>
+                        <option value="wifi_fuzz">Byte-Pattern Fuzzing</option>
+                        <option value="wifi_xss">XSS / Web UI</option>
+                        <option value="wifi_path">Path Traversal</option>
+                        <option value="wifi_crlf">CRLF / Header Inject</option>
+                        <option value="wifi_jndi">JNDI / Expression Lang</option>
+                        <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                    </optgroup>
+                    <optgroup label="Bluetooth LE (Name)">
+                        <option value="ble_cmd">BLE Command Injection</option>
+                        <option value="ble_fmt">BLE Format String</option>
+                        <option value="ble_overflow">BLE Overflow / Fuzzing</option>
+                        <option value="ble_probe">BLE Probe / Malformed</option>
+                        <option value="ble_xss">BLE XSS (companion app)</option>
+                    </optgroup>
                     <option value="custom">Custom</option>
                 </select>
                 <button id="btn-add-payload" class="btn-primary">+ Add Payload</button>
@@ -61,25 +80,42 @@
                 <div class="modal-content">
                     <h3 id="modal-title">Add Payload</h3>
                     <input type="hidden" id="modal-payload-id">
-                    <label>Payload Text (SSID)
+                    <label>Payload Text
                         <input type="text" id="modal-text" maxlength="32" placeholder="|reboot|">
+                        <small class="hint">Max 32 chars for WiFi SSID, 29 for BLE name.</small>
                     </label>
                     <label>Category
                         <select id="modal-category">
-                            <option value="wifi_cmd">Command Injection</option>
-                            <option value="wifi_overflow">Overflow / Fuzzing</option>
-                            <option value="wifi_fmt">Format String</option>
-                            <option value="wifi_probe">Probe / Malformed</option>
-                            <option value="wifi_esc">Terminal Escape</option>
-                            <option value="wifi_serial">Serialization Inject</option>
-                            <option value="wifi_enc">Encoding Attack</option>
-                            <option value="wifi_fuzz">Byte-Pattern Fuzzing</option>
-                            <option value="wifi_xss">XSS / Web UI</option>
-                            <option value="wifi_path">Path Traversal</option>
-                            <option value="wifi_crlf">CRLF / Header Inject</option>
-                            <option value="wifi_jndi">JNDI / Expression Lang</option>
-                            <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                            <optgroup label="WiFi (SSID)">
+                                <option value="wifi_cmd">Command Injection</option>
+                                <option value="wifi_overflow">Overflow / Fuzzing</option>
+                                <option value="wifi_fmt">Format String</option>
+                                <option value="wifi_probe">Probe / Malformed</option>
+                                <option value="wifi_esc">Terminal Escape</option>
+                                <option value="wifi_serial">Serialization Inject</option>
+                                <option value="wifi_enc">Encoding Attack</option>
+                                <option value="wifi_fuzz">Byte-Pattern Fuzzing</option>
+                                <option value="wifi_xss">XSS / Web UI</option>
+                                <option value="wifi_path">Path Traversal</option>
+                                <option value="wifi_crlf">CRLF / Header Inject</option>
+                                <option value="wifi_jndi">JNDI / Expression Lang</option>
+                                <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                            </optgroup>
+                            <optgroup label="Bluetooth LE (Name)">
+                                <option value="ble_cmd">BLE Command Injection</option>
+                                <option value="ble_fmt">BLE Format String</option>
+                                <option value="ble_overflow">BLE Overflow / Fuzzing</option>
+                                <option value="ble_probe">BLE Probe / Malformed</option>
+                                <option value="ble_xss">BLE XSS (companion app)</option>
+                            </optgroup>
                             <option value="custom">Custom</option>
+                        </select>
+                    </label>
+                    <label>Radio
+                        <select id="modal-protocols">
+                            <option value="wifi">WiFi only</option>
+                            <option value="ble">Bluetooth LE only</option>
+                            <option value="both">Both (ESP32)</option>
                         </select>
                     </label>
                     <label>Description
@@ -186,6 +222,6 @@
         </section>
     </main>
 
-    <script src="/static/app.js?v=10"></script>
+    <script src="/static/app.js?v=11"></script>
 </body>
 </html>

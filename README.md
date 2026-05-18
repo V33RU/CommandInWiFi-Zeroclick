@@ -3,15 +3,17 @@
 </p>
 
 <h1 align="center">CommandInWiFi</h1>
-<p align="center"><strong>An SSID injection test tool for IoT security research</strong></p>
+<p align="center"><strong>An SSID and BLE-name injection test tool for IoT security research</strong></p>
 
 ---
 
 ## Before you start
 
-This project exists to explain how SSID-injection payloads work and to help you understand the bug class behind them. If your goal is just to test, you can skip the project entirely. Rename your phone hotspot to something like `|reboot|` or `$(reboot)`, or run `hostapd` on a laptop with the SSID set to a payload, and you have reproduced most of what this tool does. The rest is a curated catalog of payloads grouped by bug class, an ESP board that cycles through them on a schedule, and a small dashboard for tracking results across many runs.
+This project exists to explain how SSID-injection and BLE-name-injection payloads work, and to help you understand the bug class behind them. If your goal is just to test, you can skip the project entirely. Rename your phone hotspot to something like `|reboot|` or `$(reboot)`, run `hostapd` on a laptop with the SSID set to a payload, or rename your phone's Bluetooth name and watch what a target device does. That reproduces most of what this tool does. The rest is a curated catalog of payloads grouped by bug class, an ESP32 board that cycles through them on a schedule across either radio, and a small dashboard for tracking results across many runs.
 
-Use it if you want to step through the categories or run a longer session. For a one-off check against your own gear, a hotspot is faster.
+Use it if you want to step through the categories or run a longer session. For a one-off check against your own gear, a phone is faster.
+
+The dashboard has a Radio selector at the top: WiFi (SSID), Bluetooth LE (Name), or Both. ESP32 supports all three. ESP8266 supports WiFi only.
 
 Read [ATTACK_MODEL.md](ATTACK_MODEL.md) first to see which payload classes actually fire on real targets and which CVEs are verified precedents.
 

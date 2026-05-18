@@ -58,6 +58,38 @@
     }
 
     // ====================================================================
+    // Radio mode (WiFi / BLE / Both). Mirrors firmware state on the ESP.
+    // ====================================================================
+    var radioModeSelect = document.getElementById("radio-mode-select");
+
+    async function loadRadioMode() {
+        try {
+            var res = await fetch("/api/mode");
+            var data = await res.json();
+            if (data.mode) radioModeSelect.value = data.mode;
+        } catch (err) {
+            // Backend not up yet, leave default.
+        }
+    }
+
+    radioModeSelect.addEventListener("change", async function () {
+        var mode = radioModeSelect.value;
+        var res = await fetch("/api/mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: mode }),
+        });
+        var data = await res.json();
+        if (data.error) {
+            showToast("Radio mode: " + data.error, "warn");
+        } else {
+            showToast("Radio mode set to " + data.mode, "ok");
+        }
+    });
+
+    loadRadioMode();
+
+    // ====================================================================
     // Selection State
     // ====================================================================
     var selectedIds = new Set();
@@ -126,6 +158,7 @@
         document.getElementById("modal-payload-id").value = "";
         document.getElementById("modal-text").value = "";
         document.getElementById("modal-category").value = "wifi_cmd";
+        document.getElementById("modal-protocols").value = "wifi";
         document.getElementById("modal-description").value = "";
         document.getElementById("payload-modal").classList.remove("hidden");
     });
@@ -140,6 +173,7 @@
             text: document.getElementById("modal-text").value,
             category: document.getElementById("modal-category").value,
             description: document.getElementById("modal-description").value,
+            protocols: document.getElementById("modal-protocols").value,
         };
         if (!body.text) return;
 
@@ -235,6 +269,7 @@
                 document.getElementById("modal-payload-id").value = p.id;
                 document.getElementById("modal-text").value = p.text;
                 document.getElementById("modal-category").value = p.category;
+                document.getElementById("modal-protocols").value = p.protocols || "wifi";
                 document.getElementById("modal-description").value = p.description;
                 document.getElementById("payload-modal").classList.remove("hidden");
             });

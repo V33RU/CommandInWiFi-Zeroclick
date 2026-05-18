@@ -19,9 +19,11 @@ VALID_CATEGORIES = [
     "wifi_cmd", "wifi_overflow", "wifi_fmt", "wifi_probe",
     "wifi_esc", "wifi_serial", "wifi_enc", "wifi_fuzz",
     "wifi_xss", "wifi_path", "wifi_crlf", "wifi_jndi", "wifi_nosql",
+    "ble_cmd", "ble_fmt", "ble_overflow", "ble_probe", "ble_xss",
     "custom",
 ]
 VALID_STATUSES = ["crashed", "rebooted", "survived", "unknown"]
+VALID_RADIO_MODES = ["wifi", "ble", "both"]
 
 
 # -- Lifespan --------------------------------------------------------------
@@ -51,11 +53,16 @@ class PayloadCreate(BaseModel):
     text: str
     category: str
     description: str = ""
+    protocols: str = "wifi"  # 'wifi', 'ble', or 'both'
 
 class PayloadUpdate(BaseModel):
     text: Optional[str] = None
     category: Optional[str] = None
     description: Optional[str] = None
+    protocols: Optional[str] = None
+
+class RadioModeRequest(BaseModel):
+    mode: str  # 'wifi', 'ble', or 'both'
 
 class ResultCreate(BaseModel):
     payload_id: int
@@ -96,10 +103,12 @@ def list_payloads(category: Optional[str] = Query(None)):
 def create_payload(payload: PayloadCreate):
     if payload.category not in VALID_CATEGORIES:
         raise HTTPException(400, f"Invalid category. Must be one of: {VALID_CATEGORIES}")
+    if payload.protocols not in ("wifi", "ble", "both"):
+        raise HTTPException(400, "Invalid protocols. Must be wifi, ble, or both")
     conn = get_db()
     cur = conn.execute(
-        "INSERT INTO payloads (text, category, description) VALUES (?, ?, ?)",
-        (payload.text, payload.category, payload.description),
+        "INSERT INTO payloads (text, category, description, protocols) VALUES (?, ?, ?, ?)",
+        (payload.text, payload.category, payload.description, payload.protocols),
     )
     conn.commit()
     row = conn.execute("SELECT * FROM payloads WHERE id = ?", (cur.lastrowid,)).fetchone()
@@ -118,6 +127,9 @@ def update_payload(payload_id: int, payload: PayloadUpdate):
     if "category" in updates and updates["category"] not in VALID_CATEGORIES:
         conn.close()
         raise HTTPException(400, f"Invalid category. Must be one of: {VALID_CATEGORIES}")
+    if "protocols" in updates and updates["protocols"] not in ("wifi", "ble", "both"):
+        conn.close()
+        raise HTTPException(400, "Invalid protocols. Must be wifi, ble, or both")
     if updates:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         conn.execute(
@@ -292,6 +304,28 @@ def deploy_status():
         "connected": connected,
         "deploy_status": serial_manager.deploy_status,
         "deploy_count": serial_manager.deploy_count,
+        "radio_mode": serial_manager.radio_mode,
+    }
+
+
+# -- Radio mode ------------------------------------------------------------
+
+@app.get("/api/mode")
+def get_radio_mode():
+    return {"mode": serial_manager.radio_mode}
+
+
+@app.post("/api/mode")
+async def set_radio_mode(req: RadioModeRequest):
+    if req.mode not in VALID_RADIO_MODES:
+        raise HTTPException(400, f"Invalid mode. Must be one of: {VALID_RADIO_MODES}")
+    result = await serial_manager.set_mode(req.mode)
+    # The mode is recorded as the user's intent even when the ESP is offline,
+    # so always return 200 with the current state.
+    return {
+        "ok": result.get("ok", False),
+        "mode": serial_manager.radio_mode,
+        "error": result.get("error"),
     }
 
 
@@ -311,6 +345,7 @@ def get_devices():
         "events": serial_manager.device_events[-50:],
         "vulns": vuln_events[-20:],
         "current_ssid": serial_manager.current_ssid,
+        "radio_mode": serial_manager.radio_mode,
     }
 
 
