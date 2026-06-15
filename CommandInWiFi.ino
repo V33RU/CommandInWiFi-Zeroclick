@@ -27,7 +27,7 @@ bool useDashboard = false;  // true once first CIW command received
 // Track current SSID for device event correlation
 String currentSSID = "";
 
-// ESP8266 event handlers (must be global — RAII prevents local scope)
+// ESP8266 event handlers (must be global, RAII prevents local scope)
 #ifndef ESP32
 WiFiEventHandler stationConnectedHandler;
 WiFiEventHandler stationDisconnectedHandler;

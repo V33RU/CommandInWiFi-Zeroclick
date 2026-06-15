@@ -6,7 +6,7 @@ import ubinascii
 
 # ── Default SSIDs (used when no payloads pushed via serial) ──────────────
 default_ssids = ["|reboot|", "&reboot&", "`reboot`", "$reboot$"]
-# Open AP (no password) — SSIDs must be visible to all scanning devices
+# Open AP (no password), SSIDs must be visible to all scanning devices
 
 # ── Dynamic payload queue (filled via CIW serial protocol) ───────────────
 payload_queue = []
@@ -132,7 +132,7 @@ def check_serial():
 
 # ── Boot ─────────────────────────────────────────────────────────────────
 print("CIW:BOOT")
-print("CommandInWiFi v2.0 (MicroPython) — CIW Protocol Ready")
+print("CommandInWiFi v2.0 (MicroPython) CIW Protocol Ready")
 
 change_ssid()
 is_running = True
