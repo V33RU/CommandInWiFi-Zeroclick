@@ -49,18 +49,27 @@ BLEServer* bleServer = nullptr;
 BLEAdvertising* bleAdv = nullptr;
 bool bleStarted = false;
 
+static String bdaToString(uint8_t* b) {
+  char mac[18];
+  snprintf(mac, sizeof(mac), "%02X:%02X:%02X:%02X:%02X:%02X",
+           b[0], b[1], b[2], b[3], b[4], b[5]);
+  return String(mac);
+}
+
 class CIWServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* server) override {
-    // Best-effort MAC. The Arduino BLE wrapper does not expose the peer
-    // MAC on this callback in a portable way, so we report a placeholder.
-    // Real attribution comes from the disconnect event when the stack
-    // includes the address. For the detector, the consistent placeholder
-    // is fine because it pairs with the matching disconnect.
-    Serial.print("CIW:BLE_CONNECT:00:00:00:00:00:00|");
+  // Use the param overloads so we get the real peer address. Reporting a
+  // constant placeholder would make every BLE central collide in the
+  // dashboard's per-MAC tracking and cooldown.
+  void onConnect(BLEServer* server, esp_ble_gatts_cb_param_t* param) override {
+    Serial.print("CIW:BLE_CONNECT:");
+    Serial.print(bdaToString(param->connect.remote_bda));
+    Serial.print("|");
     Serial.println(currentSSID);
   }
-  void onDisconnect(BLEServer* server) override {
-    Serial.print("CIW:BLE_DISCONNECT:00:00:00:00:00:00|");
+  void onDisconnect(BLEServer* server, esp_ble_gatts_cb_param_t* param) override {
+    Serial.print("CIW:BLE_DISCONNECT:");
+    Serial.print(bdaToString(param->disconnect.remote_bda));
+    Serial.print("|");
     Serial.println(currentSSID);
     // Resume advertising; the stack stops adv on connect by default.
     if (bleAdv) bleAdv->start();
@@ -76,6 +85,25 @@ const long ssidChangeInterval = 2 * 60 * 1000; // 2 minutes
 const long deviceListInterval = 60 * 1000;     // 1 minute
 
 String serialBuffer = "";
+
+// Explicit forward declarations. Arduino normally auto-generates these, but
+// its insertion point can land inside the #ifdef ESP32 block above, which
+// would drop the prototypes for the ESP8266 build. Declaring them here keeps
+// both builds deterministic.
+int b64index(char c);
+String b64decode(const String &input);
+const char* modeString(int m);
+void checkSerialCommand();
+void processCommand(const String &cmd);
+int getActiveCount();
+void changeName();
+void listConnectedDevices();
+#ifdef ESP32
+void setBleName(const char* name);
+void stopBle();
+#else
+String macToString(const uint8_t* mac);
+#endif
 
 // Minimal base64 decoder so we do not need an extra library.
 static const char b64chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -338,8 +366,10 @@ void setBleName(const char* name) {
   }
 
   // Rename and rebuild the advertisement data so scanners see the new
-  // payload as the Complete Local Name AD field.
-  BLEDevice::setDeviceName(name);
+  // payload as the Complete Local Name AD field. esp_ble_gap_set_device_name
+  // updates the GAP device name; the advertised Complete Local Name is set
+  // separately via adv.setName below (that is what scanners display).
+  esp_ble_gap_set_device_name(name);
   if (bleAdv) {
     bleAdv->stop();
     BLEAdvertisementData adv;

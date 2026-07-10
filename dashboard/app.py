@@ -353,14 +353,22 @@ class VulnSaveRequest(BaseModel):
     mac: str
     ssid: str
     vuln_type: str  # crash, reboot
+    radio: Optional[str] = None  # 'wifi' or 'ble', to disambiguate dup payload text
 
 
 @app.post("/api/devices/save-result", status_code=201)
 def save_vuln_result(req: VulnSaveRequest):
     """Auto-save a detected vulnerability to the results table."""
     conn = get_db()
+    # The same payload text can exist as both a WiFi and a BLE row (for
+    # example |reboot| or %x%x%x%x). Disambiguate by the radio the hit came
+    # in on so the result is attributed to the correct payload. A plain
+    # fetchone() on text alone would pick an arbitrary row.
+    radio = req.radio or serial_manager.radio_mode
     payload = conn.execute(
-        "SELECT * FROM payloads WHERE text = ?", (req.ssid,)
+        "SELECT * FROM payloads WHERE text = ? "
+        "ORDER BY (protocols = ? OR protocols = 'both') DESC, id ASC LIMIT 1",
+        (req.ssid, radio),
     ).fetchone()
     if not payload:
         conn.close()

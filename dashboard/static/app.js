@@ -668,6 +668,7 @@
                 '</div>' +
                 '<button class="vuln-save-btn" data-mac="' + escapeHtml(v.mac) + '" ' +
                 'data-ssid="' + escapeHtml(v.ssid || "") + '" ' +
+                'data-radio="' + escapeHtml(v.radio || "wifi") + '" ' +
                 'data-vuln="' + escapeHtml(vuln) + '">Save to Results</button>' +
                 '</div>'
             );
@@ -686,6 +687,7 @@
                             mac: btn.dataset.mac,
                             ssid: btn.dataset.ssid,
                             vuln_type: btn.dataset.vuln,
+                            radio: btn.dataset.radio,
                         }),
                     });
                     if (res.ok) {
