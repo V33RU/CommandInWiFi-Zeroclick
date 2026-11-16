@@ -34,6 +34,7 @@
                     <option value="">All Categories</option>
                     <optgroup label="WiFi (SSID)">
                         <option value="wifi_cmd">Command Injection</option>
+                        <option value="wifi_sqli">SQL Injection</option>
                         <option value="wifi_overflow">Overflow / Fuzzing</option>
                         <option value="wifi_fmt">Format String</option>
                         <option value="wifi_probe">Probe / Malformed</option>
@@ -46,6 +47,9 @@
                         <option value="wifi_crlf">CRLF / Header Inject</option>
                         <option value="wifi_jndi">JNDI / Expression Lang</option>
                         <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                        <option value="wifi_ssrf">SSRF / URL Fetch</option>
+                        <option value="wifi_argv">Argument Injection</option>
+                        <option value="wifi_php">PHP Wrappers</option>
                     </optgroup>
                     <optgroup label="Bluetooth LE (Name)">
                         <option value="ble_cmd">BLE Command Injection</option>
@@ -53,6 +57,9 @@
                         <option value="ble_overflow">BLE Overflow / Fuzzing</option>
                         <option value="ble_probe">BLE Probe / Malformed</option>
                         <option value="ble_xss">BLE XSS (companion app)</option>
+                        <option value="ble_sqli">BLE SQL Injection</option>
+                        <option value="ble_serial">BLE Serialization Inject</option>
+                        <option value="ble_path">BLE Path Traversal</option>
                     </optgroup>
                     <option value="custom">Custom</option>
                 </select>
@@ -88,6 +95,7 @@
                         <select id="modal-category">
                             <optgroup label="WiFi (SSID)">
                                 <option value="wifi_cmd">Command Injection</option>
+                                <option value="wifi_sqli">SQL Injection</option>
                                 <option value="wifi_overflow">Overflow / Fuzzing</option>
                                 <option value="wifi_fmt">Format String</option>
                                 <option value="wifi_probe">Probe / Malformed</option>
@@ -100,6 +108,9 @@
                                 <option value="wifi_crlf">CRLF / Header Inject</option>
                                 <option value="wifi_jndi">JNDI / Expression Lang</option>
                                 <option value="wifi_nosql">NoSQL / LDAP Inject</option>
+                                <option value="wifi_ssrf">SSRF / URL Fetch</option>
+                                <option value="wifi_argv">Argument Injection</option>
+                                <option value="wifi_php">PHP Wrappers</option>
                             </optgroup>
                             <optgroup label="Bluetooth LE (Name)">
                                 <option value="ble_cmd">BLE Command Injection</option>
@@ -107,6 +118,9 @@
                                 <option value="ble_overflow">BLE Overflow / Fuzzing</option>
                                 <option value="ble_probe">BLE Probe / Malformed</option>
                                 <option value="ble_xss">BLE XSS (companion app)</option>
+                                <option value="ble_sqli">BLE SQL Injection</option>
+                                <option value="ble_serial">BLE Serialization Inject</option>
+                                <option value="ble_path">BLE Path Traversal</option>
                             </optgroup>
                             <option value="custom">Custom</option>
                         </select>

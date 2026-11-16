@@ -16,10 +16,12 @@ BASE_DIR = Path(__file__).resolve().parent
 serial_manager = SerialManager()
 
 VALID_CATEGORIES = [
-    "wifi_cmd", "wifi_overflow", "wifi_fmt", "wifi_probe",
+    "wifi_cmd", "wifi_sqli", "wifi_overflow", "wifi_fmt", "wifi_probe",
     "wifi_esc", "wifi_serial", "wifi_enc", "wifi_fuzz",
     "wifi_xss", "wifi_path", "wifi_crlf", "wifi_jndi", "wifi_nosql",
+    "wifi_ssrf", "wifi_argv", "wifi_php",
     "ble_cmd", "ble_fmt", "ble_overflow", "ble_probe", "ble_xss",
+    "ble_sqli", "ble_serial", "ble_path",
     "custom",
 ]
 VALID_STATUSES = ["crashed", "rebooted", "survived", "unknown"]
