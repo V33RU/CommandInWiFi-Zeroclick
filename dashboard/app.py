@@ -320,8 +320,6 @@ async def set_radio_mode(req: RadioModeRequest):
     if req.mode not in VALID_RADIO_MODES:
         raise HTTPException(400, f"Invalid mode. Must be one of: {VALID_RADIO_MODES}")
     result = await serial_manager.set_mode(req.mode)
-    # The mode is recorded as the user's intent even when the ESP is offline,
-    # so always return 200 with the current state.
     return {
         "ok": result.get("ok", False),
         "mode": serial_manager.radio_mode,
@@ -353,17 +351,13 @@ class VulnSaveRequest(BaseModel):
     mac: str
     ssid: str
     vuln_type: str  # crash, reboot
-    radio: Optional[str] = None  # 'wifi' or 'ble', to disambiguate dup payload text
+    radio: Optional[str] = None
 
 
 @app.post("/api/devices/save-result", status_code=201)
 def save_vuln_result(req: VulnSaveRequest):
     """Auto-save a detected vulnerability to the results table."""
     conn = get_db()
-    # The same payload text can exist as both a WiFi and a BLE row (for
-    # example |reboot| or %x%x%x%x). Disambiguate by the radio the hit came
-    # in on so the result is attributed to the correct payload. A plain
-    # fetchone() on text alone would pick an arbitrary row.
     radio = req.radio or serial_manager.radio_mode
     payload = conn.execute(
         "SELECT * FROM payloads WHERE text = ? "

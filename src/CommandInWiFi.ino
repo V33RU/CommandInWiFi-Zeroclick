@@ -1,11 +1,8 @@
 /*
    Project Name: CommandInWiFi
-   Description: SSID and BLE-name injection test tool. Broadcasts test
-   payloads as WiFi SSIDs and/or BLE Complete Local Names from an ESP32 or
-   ESP8266 so you can probe how nearby devices parse those fields. ESP8266
-   only supports the WiFi radio. ESP32 supports both, individually or at
-   the same time. The host dashboard drives everything over the CIW serial
-   protocol.
+   Description: SSID and BLE-name injection test tool. Broadcasts payloads as
+   WiFi SSIDs and/or BLE names. ESP8266 is WiFi only, ESP32 does both.
+   Driven by the dashboard over the CIW serial protocol.
 */
 
 #ifdef ESP32
@@ -30,8 +27,7 @@ int queueCount = 0;
 bool isRunning = false;
 bool useDashboard = false;  // becomes true after the first CIW command
 
-// Radio mode: 0=wifi, 1=ble (ESP32 only), 2=both (ESP32 only).
-// ESP8266 forces mode 0 regardless of dashboard request.
+// radio mode (ble/both are ESP32 only)
 #define MODE_WIFI 0
 #define MODE_BLE  1
 #define MODE_BOTH 2
@@ -57,9 +53,6 @@ static String bdaToString(uint8_t* b) {
 }
 
 class CIWServerCallbacks : public BLEServerCallbacks {
-  // Use the param overloads so we get the real peer address. Reporting a
-  // constant placeholder would make every BLE central collide in the
-  // dashboard's per-MAC tracking and cooldown.
   void onConnect(BLEServer* server, esp_ble_gatts_cb_param_t* param) override {
     Serial.print("CIW:BLE_CONNECT:");
     Serial.print(bdaToString(param->connect.remote_bda));
@@ -71,7 +64,6 @@ class CIWServerCallbacks : public BLEServerCallbacks {
     Serial.print(bdaToString(param->disconnect.remote_bda));
     Serial.print("|");
     Serial.println(currentSSID);
-    // Resume advertising; the stack stops adv on connect by default.
     if (bleAdv) bleAdv->start();
   }
 };
@@ -86,10 +78,7 @@ const long deviceListInterval = 60 * 1000;     // 1 minute
 
 String serialBuffer = "";
 
-// Explicit forward declarations. Arduino normally auto-generates these, but
-// its insertion point can land inside the #ifdef ESP32 block above, which
-// would drop the prototypes for the ESP8266 build. Declaring them here keeps
-// both builds deterministic.
+// forward declarations
 int b64index(char c);
 String b64decode(const String &input);
 const char* modeString(int m);
@@ -300,7 +289,6 @@ void processCommand(const String &cmd) {
     Serial.println(modeString(radioMode));
     Serial.print("CIW:MODE:");
     Serial.println(modeString(radioMode));
-    // Re-apply the current payload through the new radio set.
     if (isRunning) changeName();
 
   } else {
@@ -312,9 +300,6 @@ int getActiveCount() {
   return useDashboard ? queueCount : defaultCount;
 }
 
-// Pick the next payload string and broadcast it through whichever radios
-// are enabled. We do not stop a radio when switching mode mid-run; we just
-// let the next rotation re-apply.
 void changeName() {
   int count = getActiveCount();
   if (count == 0) return;
@@ -352,8 +337,7 @@ void changeName() {
 
 #ifdef ESP32
 void setBleName(const char* name) {
-  // Lazy-init the BLE stack on first use so users who never enable BLE do
-  // not pay the RAM cost (~30 KB).
+  // lazy-init BLE on first use
   if (!bleStarted) {
     BLEDevice::init(name);
     bleServer = BLEDevice::createServer();
@@ -365,10 +349,6 @@ void setBleName(const char* name) {
     bleStarted = true;
   }
 
-  // Rename and rebuild the advertisement data so scanners see the new
-  // payload as the Complete Local Name AD field. esp_ble_gap_set_device_name
-  // updates the GAP device name; the advertised Complete Local Name is set
-  // separately via adv.setName below (that is what scanners display).
   esp_ble_gap_set_device_name(name);
   if (bleAdv) {
     bleAdv->stop();

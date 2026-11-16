@@ -58,7 +58,7 @@
     }
 
     // ====================================================================
-    // Radio mode (WiFi / BLE / Both). Mirrors firmware state on the ESP.
+    // Radio Mode
     // ====================================================================
     var radioModeSelect = document.getElementById("radio-mode-select");
 
@@ -67,9 +67,7 @@
             var res = await fetch("/api/mode");
             var data = await res.json();
             if (data.mode) radioModeSelect.value = data.mode;
-        } catch (err) {
-            // Backend not up yet, leave default.
-        }
+        } catch (err) {}
     }
 
     radioModeSelect.addEventListener("change", async function () {
